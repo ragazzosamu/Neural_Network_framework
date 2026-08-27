@@ -21,8 +21,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(Catch2) #Catch2::Catch2
 
+add_library(tensor_lib
+            src/tensor.cpp)
 
-add_executable(EseguibileTest tests/test_iniziale.cpp)
-add_executable(Catch2Test tests/test_Catch2.cpp)
-target_link_libraries(Catch2Test PRIVATE Catch2::Catch2WithMain)
+target_include_directories(tensor_lib PUBLIC include)
+
+
+add_executable(TensorTest tests/test_tensor.cpp)
+target_link_libraries(TensorTest PRIVATE tensor_lib)
+target_link_libraries(TensorTest PRIVATE Catch2::Catch2WithMain)
+
 

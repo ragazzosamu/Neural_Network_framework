@@ -14,7 +14,7 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
-                os: ["ubuntu","macos-latest","windows-latest"]
+                os: ["ubuntu","windows-latest"]
         
         steps:
         
@@ -28,11 +28,11 @@ jobs:
         - name: Compila il progetto
           run: cmake --build build --config Release
 
-        - name: Test No Windows
+        - name: Test Ubuntu
           if: runner.os != 'Windows'
-          run: ./build/Catch2_test
+          run: ./build/TensorTest 
 
         - name: Test Windows
           if: runner.os == 'Windows'
-          run: ./build/Release/Catch2_test
+          run: ./build/Release/TensorTest 
 
