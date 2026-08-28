@@ -96,10 +96,16 @@ void Tensor::set_requires_grad(bool req) { t_require_grad = req; }
 const vector<size_t> &Tensor::shape() const { return t_shape; }
 const vector<size_t> &Tensor::strides() const { return t_strides; }
 size_t Tensor::size() const { return totalSize; }
+
 std::shared_ptr<float[]> Tensor::data() const { return t_data; }
+void Tensor::set_data(size_t i, float value) { t_data[i] = value; };
 
 std::shared_ptr<Tensor> Tensor::get_grad() const { return grad; }
 void Tensor::set_grad(std::shared_ptr<Tensor> new_grad) { grad = std::move(new_grad); }
+
+void Tensor::set_operation(std::shared_ptr<Operation> operation) {
+    t_operation = std::move(operation);
+}
 
 // ---------- Private Helper ----------
 

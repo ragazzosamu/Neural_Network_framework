@@ -1,5 +1,6 @@
 #pragma once
 
+#include "operation.hpp";
 #include <cstddef>
 #include <memory>
 #include <vector>
@@ -75,9 +76,13 @@ class Tensor {
     const vector<size_t> &strides() const;
     size_t size() const;
     std::shared_ptr<float[]> data() const;
+    void set_data(size_t i, float value);
+    void add_to_data(size_t i, float value);
 
     std::shared_ptr<Tensor> get_grad() const;
     void set_grad(std::shared_ptr<Tensor> new_grad);
+
+    void set_operation(std::shared_ptr<Operation> operation);
 
   private:
     vector<size_t> t_shape;
@@ -86,6 +91,7 @@ class Tensor {
     size_t totalSize;
     std::shared_ptr<Tensor> grad = nullptr;
     bool t_require_grad;
+    std::shared_ptr<Operation> t_operation = nullptr;
 
     /// @brief Compute the strides based on the @p shape.
     void computeStrides();
