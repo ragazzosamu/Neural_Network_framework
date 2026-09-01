@@ -30,7 +30,8 @@ add_library(operations_lib
             src/matsum.cpp
             src/matmul.cpp
             src/relu.cpp
-            src/softmax.cpp)
+            src/softmax.cpp
+            src/crossentropy.cpp)
 
 target_include_directories(operations_lib PUBLIC include)
 
