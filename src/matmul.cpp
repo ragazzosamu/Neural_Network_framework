@@ -63,9 +63,7 @@ Tensor MatMulOp::forward() {
     std::vector<size_t> stridesB = broadcast_strides(tensorB->strides(), shapeB, maxRank);
     std::vector<size_t> stridesOutput = broadcast_strides(output.strides(), shapeOutput, maxRank);
 
-    // Approach 2 ("sol2"): instead of one nested loop per batch dimension, all the batch
-    // dimensions are flattened into a single loop index `b`; the actual i/k/j matrix
-    // multiplication is then done with three explicit loops.
+    // Approach 2 ("sol2")
 
     // Original (non-broadcast) strides: needed to know the real step size in memory
     // when moving along the row/column of the actual matrices (not the broadcast view).
