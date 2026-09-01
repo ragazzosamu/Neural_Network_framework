@@ -1,12 +1,12 @@
 #pragma once
 
-#include "operation.hpp";
+#include "operation.hpp"
 #include <cstddef>
 #include <memory>
 #include <vector>
-
 using std::vector;
 
+class Operation; // Forward declaration di Operation
 /**
  * @brief A dense n-dimensional array with autograd support.
  *

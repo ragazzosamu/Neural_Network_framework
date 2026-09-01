@@ -5,15 +5,13 @@
 
 using std::vector;
 
-Tensor::Tensor(vector<size_t> shape, bool require_grad)
-    : t_shape(std::move(shape)), t_require_grad(require_grad) {
+Tensor::Tensor(vector<size_t> shape, bool require_grad) : t_shape(std::move(shape)), t_require_grad(require_grad) {
     totalSize = computeTotalSize(t_shape);
     computeStrides();
-    t_data = std::shared_ptr<float[]>(new float[totalSize]);
+    t_data = std::make_shared<float[]>(totalSize);
 }
 
-Tensor::Tensor(vector<size_t> shape, std::shared_ptr<float[]> data, bool require_grad)
-    : t_shape(std::move(shape)), t_require_grad(require_grad) {
+Tensor::Tensor(vector<size_t> shape, std::shared_ptr<float[]> data, bool require_grad) : t_shape(std::move(shape)), t_require_grad(require_grad) {
     totalSize = computeTotalSize(t_shape);
     computeStrides();
     if (data == nullptr) {
@@ -28,8 +26,7 @@ Tensor::Tensor(vector<size_t> shape, std::shared_ptr<float[]> data, bool require
 void Tensor::reshape(vector<size_t> new_shape) {
     size_t new_size = computeTotalSize(new_shape);
     if (new_size != totalSize) {
-        throw std::invalid_argument(
-            "Reshape not valid: the total number of elements doesn't coincide");
+        throw std::invalid_argument("Reshape not valid: the total number of elements doesn't coincide");
     }
     t_shape = std::move(new_shape);
     computeStrides();
@@ -56,14 +53,12 @@ Tensor Tensor::permute(const vector<size_t> &new_axis) const {
         size_t axis = new_axis[i];
 
         if (axis >= t_shape.size()) {
-            throw std::out_of_range("Axis at position " + std::to_string(i) + " (" +
-                                    std::to_string(axis) + ") exceeds max dimension (" +
+            throw std::out_of_range("Axis at position " + std::to_string(i) + " (" + std::to_string(axis) + ") exceeds max dimension (" +
                                     std::to_string(t_shape.size() - 1) + ")");
         }
 
         if (seen[axis]) {
-            throw std::invalid_argument("Duplicate axis " + std::to_string(axis) + " at index " +
-                                        std::to_string(i));
+            throw std::invalid_argument("Duplicate axis " + std::to_string(axis) + " at index " + std::to_string(i));
         }
 
         seen[axis] = true;
@@ -98,14 +93,13 @@ const vector<size_t> &Tensor::strides() const { return t_strides; }
 size_t Tensor::size() const { return totalSize; }
 
 std::shared_ptr<float[]> Tensor::data() const { return t_data; }
-void Tensor::set_data(size_t i, float value) { t_data[i] = value; };
+void Tensor::set_data(size_t i, float value) { t_data[i] = value; }
+void Tensor::add_to_data(size_t i, float value) { t_data[i] += value; }
 
 std::shared_ptr<Tensor> Tensor::get_grad() const { return grad; }
 void Tensor::set_grad(std::shared_ptr<Tensor> new_grad) { grad = std::move(new_grad); }
 
-void Tensor::set_operation(std::shared_ptr<Operation> operation) {
-    t_operation = std::move(operation);
-}
+void Tensor::set_operation(std::shared_ptr<Operation> operation) { t_operation = std::move(operation); }
 
 // ---------- Private Helper ----------
 

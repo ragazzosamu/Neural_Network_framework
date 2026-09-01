@@ -30,9 +30,13 @@ jobs:
 
         - name: Test Ubuntu
           if: runner.os != 'Windows'
-          run: ./build/TensorTest 
+          run: |
+            ./build/TensorTest
+            ./build/OperationTest
 
         - name: Test Windows
           if: runner.os == 'Windows'
-          run: ./build/Release/TensorTest 
+          run: |
+            ./build/Release/TensorTest.exe
+            ./build/Release/OperationTest.exe
 

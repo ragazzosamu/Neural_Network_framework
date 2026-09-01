@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 project(Neural_Networks_framework VERSION 1.0 LANGUAGES CXX)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include(FetchContent)
 
 
@@ -25,10 +26,21 @@ add_library(tensor_lib
             src/tensor.cpp)
 
 target_include_directories(tensor_lib PUBLIC include)
+add_library(operations_lib
+            src/matsum.cpp
+            src/matmul.cpp
+            src/relu.cpp
+            src/softmax.cpp)
 
+target_include_directories(operations_lib PUBLIC include)
 
 add_executable(TensorTest tests/test_tensor.cpp)
 target_link_libraries(TensorTest PRIVATE tensor_lib)
 target_link_libraries(TensorTest PRIVATE Catch2::Catch2WithMain)
+
+add_executable(OperationTest tests/test_operations.cpp)
+target_link_libraries(operations_lib PUBLIC tensor_lib)
+target_link_libraries(OperationTest PRIVATE operations_lib tensor_lib)
+target_link_libraries(OperationTest PRIVATE Catch2::Catch2WithMain)
 
 
