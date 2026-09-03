@@ -56,7 +56,7 @@ float Loss::cross_entropy() {
     // can't declare `Tensor loss;` and assign into it inside the try block.
     // An immediately-invoked lambda lets us keep the try/catch context
     // wrapping while direct-initializing `loss` from its return value.
-    Tensor loss = [&]() -> Tensor {
+    std::shared_ptr<Tensor> loss = [&]() -> std::shared_ptr<Tensor> {
         try {
             auto cross_entropy_op = std::make_shared<CrossEntropyOp>(ce_inputs);
             return cross_entropy_op->forward();
@@ -65,8 +65,8 @@ float Loss::cross_entropy() {
         }
     }();
 
-    auto const &loss_data = loss.data();
-    size_t loss_size = loss.size();
+    auto const &loss_data = loss->data();
+    size_t loss_size = loss->size();
 
     // Guard against division by zero: forward() should never legitimately
     // return an empty tensor here, but a buggy or misconfigured Op could.

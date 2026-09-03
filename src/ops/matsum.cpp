@@ -1,4 +1,4 @@
-#include "matsum.hpp"
+#include "ops/matsum.hpp"
 #include <algorithm>
 #include <stdexcept>
 #include <vector>
@@ -6,7 +6,7 @@
 // Computes C = A + B element-wise, with NumPy-style broadcasting on every
 // dimension (unlike MatMulOp, there's no "special" last-two-dimensions
 // treatment here: every axis is broadcast the same way).
-Tensor MatSumOp::forward() {
+std::shared_ptr<Tensor> MatSumOp::forward() {
     if (o_inputs.size() != 2) {
         throw std::invalid_argument("The number of inputs must be 2");
     }
@@ -64,7 +64,7 @@ Tensor MatSumOp::forward() {
     }
 
     output.set_operation(shared_from_this());
-    return output;
+    return std::make_shared<Tensor>(std::move(output));
 }
 
 // Backward pass for C = A + B: the local derivative of a sum with respect to
@@ -123,6 +123,8 @@ void MatSumOp::backward(std::shared_ptr<Tensor> grad) const {
         tensorB->get_grad()->add_to_data(offsetB, grad->data()[i]);
     }
 }
+
+// ---------- Private Helper ----------
 
 // Pads `strides` on the left with 0s up to `maxRank`, then zeroes out the
 // stride of every axis where `shape` is 1 (broadcast axis), so that iterating

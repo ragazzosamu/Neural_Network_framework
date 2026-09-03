@@ -7,11 +7,11 @@
 #include <stdexcept>
 #include <vector>
 
-#include "crossentropy.hpp"
-#include "matmul.hpp"
-#include "matsum.hpp"
-#include "relu.hpp"
-#include "softmax.hpp"
+#include "ops/crossentropy.hpp"
+#include "ops/matmul.hpp"
+#include "ops/matsum.hpp"
+#include "ops/relu.hpp"
+#include "ops/softmax.hpp"
 
 using Catch::Approx;
 
@@ -36,13 +36,13 @@ TEST_CASE("MatMulOp: forward computes A @ B", "[operation][matmul][forward]") {
     auto B = make_tensor({2, 2}, {5, 6, 7, 8});
 
     auto op = std::make_shared<MatMulOp>(std::vector<std::shared_ptr<Tensor>>{A, B});
-    Tensor C = op->forward();
+    auto C = op->forward();
 
     // Expected: [[19, 22], [43, 50]]
-    REQUIRE(C.data()[0] == Approx(19));
-    REQUIRE(C.data()[1] == Approx(22));
-    REQUIRE(C.data()[2] == Approx(43));
-    REQUIRE(C.data()[3] == Approx(50));
+    REQUIRE(C->data()[0] == Approx(19));
+    REQUIRE(C->data()[1] == Approx(22));
+    REQUIRE(C->data()[2] == Approx(43));
+    REQUIRE(C->data()[3] == Approx(50));
 }
 
 TEST_CASE("MatMulOp: backward computes dA = dC @ B^T and dB = A^T @ dC", "[operation][matmul][backward]") {
@@ -143,12 +143,12 @@ TEST_CASE("MatSumOp: forward computes A + B element-wise", "[operation][matsum][
     auto B = make_tensor({2, 2}, {10, 20, 30, 40});
 
     auto op = std::make_shared<MatSumOp>(std::vector<std::shared_ptr<Tensor>>{A, B});
-    Tensor C = op->forward();
+    auto C = op->forward();
 
-    REQUIRE(C.data()[0] == Approx(11));
-    REQUIRE(C.data()[1] == Approx(22));
-    REQUIRE(C.data()[2] == Approx(33));
-    REQUIRE(C.data()[3] == Approx(44));
+    REQUIRE(C->data()[0] == Approx(11));
+    REQUIRE(C->data()[1] == Approx(22));
+    REQUIRE(C->data()[2] == Approx(33));
+    REQUIRE(C->data()[3] == Approx(44));
 }
 
 TEST_CASE("MatSumOp: backward with same-shape operands routes grad unchanged", "[operation][matsum][backward]") {
@@ -172,12 +172,12 @@ TEST_CASE("MatSumOp: backward sums the gradient back over a broadcast axis", "[o
     auto B = make_tensor({1, 2}, {100, 200}); // broadcast over rows
 
     auto op = std::make_shared<MatSumOp>(std::vector<std::shared_ptr<Tensor>>{A, B});
-    Tensor C = op->forward();
+    auto C = op->forward();
 
-    REQUIRE(C.data()[0] == Approx(101));
-    REQUIRE(C.data()[1] == Approx(202));
-    REQUIRE(C.data()[2] == Approx(103));
-    REQUIRE(C.data()[3] == Approx(204));
+    REQUIRE(C->data()[0] == Approx(101));
+    REQUIRE(C->data()[1] == Approx(202));
+    REQUIRE(C->data()[2] == Approx(103));
+    REQUIRE(C->data()[3] == Approx(204));
 
     auto dC = make_tensor({2, 2}, {1, 1, 1, 1});
     op->backward(dC);
@@ -236,14 +236,14 @@ TEST_CASE("ReluOp: forward computes max(0, x) element-wise", "[operation][relu][
     auto X = make_tensor({2, 3}, {-2, -1, 0, 1, 2, 3});
 
     auto op = std::make_shared<ReluOp>(std::vector<std::shared_ptr<Tensor>>{X});
-    Tensor Y = op->forward();
+    auto Y = op->forward();
 
-    REQUIRE(Y.data()[0] == Approx(0));
-    REQUIRE(Y.data()[1] == Approx(0));
-    REQUIRE(Y.data()[2] == Approx(0));
-    REQUIRE(Y.data()[3] == Approx(1));
-    REQUIRE(Y.data()[4] == Approx(2));
-    REQUIRE(Y.data()[5] == Approx(3));
+    REQUIRE(Y->data()[0] == Approx(0));
+    REQUIRE(Y->data()[1] == Approx(0));
+    REQUIRE(Y->data()[2] == Approx(0));
+    REQUIRE(Y->data()[3] == Approx(1));
+    REQUIRE(Y->data()[4] == Approx(2));
+    REQUIRE(Y->data()[5] == Approx(3));
 }
 
 TEST_CASE("ReluOp: backward gates the gradient by the sign of the input", "[operation][relu][backward]") {
@@ -295,11 +295,11 @@ TEST_CASE("SoftmaxOp: forward on a uniform row gives a uniform distribution", "[
     auto X = make_tensor({3}, {0, 0, 0});
 
     auto op = std::make_shared<SoftmaxOp>(std::vector<std::shared_ptr<Tensor>>{X});
-    Tensor Y = op->forward();
+    auto Y = op->forward();
 
-    REQUIRE(Y.data()[0] == Approx(1.0 / 3.0));
-    REQUIRE(Y.data()[1] == Approx(1.0 / 3.0));
-    REQUIRE(Y.data()[2] == Approx(1.0 / 3.0));
+    REQUIRE(Y->data()[0] == Approx(1.0 / 3.0));
+    REQUIRE(Y->data()[1] == Approx(1.0 / 3.0));
+    REQUIRE(Y->data()[2] == Approx(1.0 / 3.0));
 }
 
 TEST_CASE("SoftmaxOp: forward matches the direct definition, row by row", "[operation][softmax][forward]") {
@@ -309,7 +309,7 @@ TEST_CASE("SoftmaxOp: forward matches the direct definition, row by row", "[oper
     auto X = make_tensor({2, 3}, x);
 
     auto op = std::make_shared<SoftmaxOp>(std::vector<std::shared_ptr<Tensor>>{X});
-    Tensor Y = op->forward();
+    auto Y = op->forward();
 
     for (size_t row = 0; row < 2; ++row) {
         size_t off = row * 3;
@@ -319,10 +319,10 @@ TEST_CASE("SoftmaxOp: forward matches the direct definition, row by row", "[oper
         float e2 = std::exp(x[off + 2] - m);
         float sum = e0 + e1 + e2;
 
-        REQUIRE(Y.data()[off] == Approx(e0 / sum));
-        REQUIRE(Y.data()[off + 1] == Approx(e1 / sum));
-        REQUIRE(Y.data()[off + 2] == Approx(e2 / sum));
-        REQUIRE(Y.data()[off] + Y.data()[off + 1] + Y.data()[off + 2] == Approx(1.0f));
+        REQUIRE(Y->data()[off] == Approx(e0 / sum));
+        REQUIRE(Y->data()[off + 1] == Approx(e1 / sum));
+        REQUIRE(Y->data()[off + 2] == Approx(e2 / sum));
+        REQUIRE(Y->data()[off] + Y->data()[off + 1] + Y->data()[off + 2] == Approx(1.0f));
     }
 }
 
@@ -331,7 +331,7 @@ TEST_CASE("SoftmaxOp: backward matches the softmax-Jacobian formula", "[operatio
     auto X = make_tensor({3}, x);
 
     auto op = std::make_shared<SoftmaxOp>(std::vector<std::shared_ptr<Tensor>>{X});
-    Tensor Y = op->forward();
+    auto Y = op->forward();
 
     std::vector<float> g = {1, 0, 0}; // fixed upstream gradient
     auto dY = make_tensor({3}, g);
@@ -341,11 +341,11 @@ TEST_CASE("SoftmaxOp: backward matches the softmax-Jacobian formula", "[operatio
     // dx_j = y_j * (g_j - sum_k(g_k * y_k))
     float dot = 0.0f;
     for (size_t k = 0; k < 3; ++k)
-        dot += g[k] * Y.data()[k];
+        dot += g[k] * Y->data()[k];
 
     auto dX = X->get_grad();
     for (size_t j = 0; j < 3; ++j) {
-        float expected = Y.data()[j] * (g[j] - dot);
+        float expected = Y->data()[j] * (g[j] - dot);
         REQUIRE(dX->data()[j] == Approx(expected));
     }
 }
@@ -390,15 +390,15 @@ TEST_CASE("CrossEntropyOp: forward computes -sum(target * log(p)) per row", "[op
     auto T = make_tensor({2, 3}, t);
 
     auto op = std::make_shared<CrossEntropyOp>(std::vector<std::shared_ptr<Tensor>>{P, T});
-    Tensor loss = op->forward();
+    auto loss = op->forward();
 
     const float eps = 1e-7f;
     float expected0 = -std::log(p[0] + eps); // target picks column 0 on row 0
     float expected1 = -std::log(p[5] + eps); // target picks column 2 on row 1
 
-    REQUIRE(loss.shape() == std::vector<size_t>{2, 1});
-    REQUIRE(loss.data()[0] == Approx(expected0));
-    REQUIRE(loss.data()[1] == Approx(expected1));
+    REQUIRE(loss->shape() == std::vector<size_t>{2, 1});
+    REQUIRE(loss->data()[0] == Approx(expected0));
+    REQUIRE(loss->data()[1] == Approx(expected1));
 }
 
 TEST_CASE("CrossEntropyOp: backward matches -grad_row * target / p", "[operation][crossentropy][backward]") {
@@ -484,15 +484,15 @@ TEST_CASE("Chaining MatSumOp -> ReluOp propagates gradients through both ops", "
     auto B = make_tensor({2, 2}, {1, 1, 1, 1});
 
     auto sumOp = std::make_shared<MatSumOp>(std::vector<std::shared_ptr<Tensor>>{A, B});
-    auto S = std::make_shared<Tensor>(sumOp->forward()); // S = A + B = [[2,-4],[4,5]]
+    auto S = sumOp->forward(); // S = A + B = [[2,-4],[4,5]]
 
     auto reluOp = std::make_shared<ReluOp>(std::vector<std::shared_ptr<Tensor>>{S});
-    Tensor Y = reluOp->forward(); // relu(S) = [[2,0],[4,5]]
+    auto Y = reluOp->forward(); // relu(S) = [[2,0],[4,5]]
 
-    REQUIRE(Y.data()[0] == Approx(2));
-    REQUIRE(Y.data()[1] == Approx(0));
-    REQUIRE(Y.data()[2] == Approx(4));
-    REQUIRE(Y.data()[3] == Approx(5));
+    REQUIRE(Y->data()[0] == Approx(2));
+    REQUIRE(Y->data()[1] == Approx(0));
+    REQUIRE(Y->data()[2] == Approx(4));
+    REQUIRE(Y->data()[3] == Approx(5));
 
     auto dY = make_tensor({2, 2}, {1, 2, 3, 4});
     reluOp->backward(dY); // populates S->get_grad()
@@ -521,16 +521,16 @@ TEST_CASE("A single layer (MatMulOp -> ReluOp) forward and backward", "[operatio
     auto x = make_tensor({3, 1}, {1, 2, 3});
 
     auto matmulOp = std::make_shared<MatMulOp>(std::vector<std::shared_ptr<Tensor>>{W, x});
-    auto Z = std::make_shared<Tensor>(matmulOp->forward()); // W @ x = [[5],[-1]]
+    auto Z = matmulOp->forward(); // W @ x = [[5],[-1]]
 
     REQUIRE(Z->data()[0] == Approx(5));
     REQUIRE(Z->data()[1] == Approx(-1));
 
     auto reluOp = std::make_shared<ReluOp>(std::vector<std::shared_ptr<Tensor>>{Z});
-    Tensor Y = reluOp->forward(); // relu(Z) = [[5],[0]]
+    auto Y = reluOp->forward(); // relu(Z) = [[5],[0]]
 
-    REQUIRE(Y.data()[0] == Approx(5));
-    REQUIRE(Y.data()[1] == Approx(0));
+    REQUIRE(Y->data()[0] == Approx(5));
+    REQUIRE(Y->data()[1] == Approx(0));
 
     auto dY = make_tensor({2, 1}, {1, 2});
     reluOp->backward(dY); // -> Z->get_grad() = [[1],[0]]

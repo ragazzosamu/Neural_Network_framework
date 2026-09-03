@@ -1,11 +1,11 @@
-#include "matmul.hpp"
+#include "ops/matmul.hpp"
 #include <algorithm>
 #include <stdexcept>
 #include <vector>
 
 // Computes C = A @ B with NumPy-style broadcasting on all dimensions
 // except the last two (which are treated as the actual matrix rows/columns).
-Tensor MatMulOp::forward() {
+std::shared_ptr<Tensor> MatMulOp::forward() {
     if (o_inputs.size() != 2) {
         throw std::invalid_argument("The number of inputs must be 2");
     }
@@ -126,7 +126,7 @@ Tensor MatMulOp::forward() {
     }
 
     output.set_operation(shared_from_this());
-    return output;
+    return std::make_shared<Tensor>(std::move(output));
 }
 
 // Approach 1 ("sol1"), deprecated: functionally correct, but too slow.
@@ -263,6 +263,8 @@ void MatMulOp::backward(std::shared_ptr<Tensor> grad) const {
         }
     }
 }
+
+// ---------- Private Helper ----------
 
 // Given a flat batch index `i` (0..number_of_batches-1) and the output's batch shape,
 // decomposes `i` back into per-dimension coordinates (row-major, starting from the

@@ -1,4 +1,5 @@
-#include "operation.hpp"
+#pragma once
+#include "ops/operation.hpp"
 #include <vector>
 
 /**
@@ -31,7 +32,7 @@ class MatMulOp : public Operation {
      *         is neither equal nor equal to 1 (incompatible for broadcasting).
      * @throws std::invalid_argument if A's row count or B's column count is 0.
      */
-    Tensor forward() override;
+    std::shared_ptr<Tensor> forward() override;
 
     /**
      * @brief Backpropagates the output gradient through the matrix multiplication,

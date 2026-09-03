@@ -1,4 +1,4 @@
-#include "softmax.hpp"
+#include "ops/softmax.hpp"
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
@@ -7,7 +7,7 @@
 // each "row" (broadcasting over every leading dimension): for an input of
 // shape (..., row_length), each row of row_length elements is turned into a
 // probability distribution that sums to 1.
-Tensor SoftmaxOp::forward() {
+std::shared_ptr<Tensor> SoftmaxOp::forward() {
     if (o_inputs.size() != 1) {
         throw std::invalid_argument("The number of inputs must be 1");
     }
@@ -66,7 +66,7 @@ Tensor SoftmaxOp::forward() {
     // derivative formula there), so it's cached here.
     saved_output = std::make_shared<Tensor>(output);
     output.set_operation(shared_from_this());
-    return output;
+    return std::make_shared<Tensor>(std::move(output));
 }
 
 // Backward pass for y = softmax(x): for each row, using y (saved_output) and

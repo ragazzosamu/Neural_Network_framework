@@ -1,4 +1,5 @@
-#include "operation.hpp"
+#pragma once
+#include "ops/operation.hpp"
 #include <vector>
 
 /**
@@ -30,7 +31,8 @@ class SoftmaxOp : public Operation {
      * @throws std::invalid_argument if the input tensor has 0 dimensions.
      * @throws std::invalid_argument if the input's last dimension is 0.
      */
-    Tensor forward() override;
+
+    std::shared_ptr<Tensor> forward() override;
 
     /**
      * @brief Backpropagates the output gradient through the softmax,

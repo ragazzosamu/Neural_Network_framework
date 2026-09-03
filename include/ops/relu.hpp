@@ -1,4 +1,5 @@
-#include "operation.hpp"
+#pragma once
+#include "ops/operation.hpp"
 #include <vector>
 
 /**
@@ -22,7 +23,7 @@ class ReluOp : public Operation {
      *         exactly 1 tensor.
      * @throws std::invalid_argument if the input tensor is null.
      */
-    Tensor forward() override;
+    std::shared_ptr<Tensor> forward() override;
 
     /**
      * @brief Backpropagates the output gradient through the ReLU, accumulating
