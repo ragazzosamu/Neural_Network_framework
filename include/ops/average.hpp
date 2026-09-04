@@ -1,6 +1,6 @@
 #pragma once
 
-#include "operation.hpp"
+#include "ops/operation.hpp"
 
 class AverageOp : public Operation {
   public:
@@ -18,7 +18,7 @@ class AverageOp : public Operation {
      * @throws std::invalid_argument if the input tensor is null.
      * @throws std::invalid_argument if the input tensor is empty (size 0).
      */
-    Tensor forward() override;
+    std::shared_ptr<Tensor> forward() override;
 
     /**
      * @brief Distributes the incoming gradient equally across all elements

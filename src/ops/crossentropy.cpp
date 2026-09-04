@@ -1,4 +1,4 @@
-#include "crossentropy.hpp"
+#include "ops/crossentropy.hpp"
 #include <cmath>
 #include <stdexcept>
 
@@ -12,7 +12,7 @@ constexpr float kEpsilon = 1e-7f;
 // Computes, for each row, the cross-entropy loss = -sum_j(target_j * log(p_j))
 // between the predicted distribution (o_inputs[0], typically a softmax
 // output) and the target distribution (o_inputs[1], typically one-hot).
-Tensor CrossEntropyOp::forward() {
+std::shared_ptr<Tensor> CrossEntropyOp::forward() {
     if (o_inputs.size() != 2) {
         throw std::invalid_argument("The number of inputs must be 2");
     }
@@ -70,7 +70,7 @@ Tensor CrossEntropyOp::forward() {
     }
 
     loss.set_operation(shared_from_this());
-    return loss;
+    return std::make_shared<Tensor>(std::move(loss));
 }
 
 // Backward pass for loss_i = -sum_j(target_j * log(p_j)): the derivative

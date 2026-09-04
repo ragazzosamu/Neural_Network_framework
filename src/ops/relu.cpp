@@ -1,8 +1,8 @@
-#include "relu.hpp"
+#include "ops/relu.hpp"
 #include <stdexcept>
 
 // Computes C = relu(A) = max(0, A), element-wise.
-Tensor ReluOp::forward() {
+std::shared_ptr<Tensor> ReluOp::forward() {
     if (o_inputs.size() != 1) {
         throw std::invalid_argument("The number of inputs must be 1");
     }
@@ -28,7 +28,7 @@ Tensor ReluOp::forward() {
     }
 
     output.set_operation(shared_from_this());
-    return output;
+    return std::make_shared<Tensor>(std::move(output));
 }
 
 // Backward pass for C = relu(A): the derivative of relu is 1 where the input

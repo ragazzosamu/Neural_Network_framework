@@ -1,5 +1,5 @@
 #pragma once
-#include "operation.hpp"
+#include "ops/operation.hpp"
 #include <memory>
 #include <vector>
 
@@ -28,7 +28,7 @@ class MatSumOp : public Operation {
      * @throws std::invalid_argument if any dimension of A and B is neither
      *         equal nor equal to 1 (incompatible for broadcasting).
      */
-    Tensor forward() override;
+    std::shared_ptr<Tensor> forward() override;
 
     /**
      * @brief Backpropagates the output gradient through the sum, accumulating

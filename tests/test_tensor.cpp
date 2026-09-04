@@ -1,12 +1,11 @@
-#include "tensor.hpp"
+#include "core/tensor.hpp"
 #include <catch2/catch_test_macros.hpp>
 #include <cstddef>
 #include <memory>
 
 TEST_CASE("Initialization test", "[Tensor][Initialization]") {
     vector<size_t> shape{4, 3};
-    std::shared_ptr<float[]> data(
-        new float[]{0.5f, 0.7f, 0.4f, 0.5f, 0.7f, 0.4f, 0.5f, 0.7f, 0.4f, 0.5f, 0.7f, 0.4f});
+    std::shared_ptr<float[]> data(new float[]{0.5f, 0.7f, 0.4f, 0.5f, 0.7f, 0.4f, 0.5f, 0.7f, 0.4f, 0.5f, 0.7f, 0.4f});
 
     SECTION("Without data") {
         Tensor tensor(shape);

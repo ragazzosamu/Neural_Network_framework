@@ -1,5 +1,5 @@
 #pragma once
-#include "operation.hpp"
+#include "ops/operation.hpp"
 #include <memory>
 #include <vector>
 
@@ -32,7 +32,7 @@ class CrossEntropyOp : public Operation {
      * @throws std::invalid_argument if the predicted tensor has 0 dimensions.
      * @throws std::invalid_argument if the last dimension is 0.
      */
-    Tensor forward() override;
+    std::shared_ptr<Tensor> forward() override;
 
     /**
      * @brief Backpropagates the output gradient, accumulating
