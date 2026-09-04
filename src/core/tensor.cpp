@@ -101,6 +101,13 @@ void Tensor::set_grad(std::shared_ptr<Tensor> new_grad) { grad = std::move(new_g
 
 void Tensor::set_operation(std::shared_ptr<Operation> operation) { t_operation = std::move(operation); }
 
+float Tensor::item() const {
+    if (totalSize != 1) {
+        throw std::invalid_argument("Tensor must have exactly one element to call item()");
+    }
+    return t_data[0];
+}
+
 // ---------- Private Helper ----------
 
 void Tensor::computeStrides() {

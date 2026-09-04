@@ -125,7 +125,11 @@ std::shared_ptr<Tensor> MatMulOp::forward() {
         }
     }
 
-    output.set_operation(shared_from_this());
+    if (tensorA->requires_grad() || tensorB->requires_grad()) {
+        output.set_requires_grad(true);
+        output.set_operation(shared_from_this());
+    }
+
     return std::make_shared<Tensor>(std::move(output));
 }
 

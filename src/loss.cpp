@@ -1,4 +1,4 @@
-#include "loss.hpp"
+#include "loss.hpp";
 
 #include <stdexcept>
 #include <string>
@@ -29,7 +29,7 @@ void Loss::validate_inputs() const {
     }
 }
 
-float Loss::cross_entropy() {
+std::shared_ptr<Tensor> Loss::cross_entropy() {
     validate_inputs();
 
     auto const &model_output = l_inputs[0];
@@ -65,24 +65,19 @@ float Loss::cross_entropy() {
         }
     }();
 
-    auto const &loss_data = loss->data();
-    size_t loss_size = loss->size();
-
-    // Guard against division by zero: forward() should never legitimately
-    // return an empty tensor here, but a buggy or misconfigured Op could.
-    if (loss_size == 0) {
-        throw std::runtime_error("Loss::cross_entropy: computed loss tensor is empty");
-    }
-
-    float sum = 0.0f;
-    for (size_t i = 0; i < loss_size; ++i) {
-        sum += loss_data[i];
-    }
-
-    return sum / static_cast<float>(loss_size);
+    std::shared_ptr<Tensor> mean_loss = [&]() -> std::shared_ptr<Tensor> {
+        try {
+            std::vector<std::shared_ptr<Tensor>> mean_inputs = {loss};
+            auto mean_op = std::make_shared<MeanOp>(mean_inputs);
+            return mean_op->forward();
+        } catch (const std::exception &e) {
+            throw std::runtime_error(std::string("Loss::cross_entropy: averaging loss failed: ") + e.what());
+        };
+    }();
+    return mean_loss;
 }
 
-float Loss::mse() {
+std::shared_ptr<Tensor> Loss::mse() {
     validate_inputs();
 
     auto const &model_output = l_inputs[0];
@@ -98,11 +93,23 @@ float Loss::mse() {
         throw std::runtime_error("Loss::mse: input tensors are empty");
     }
 
-    float sum = 0.0f;
-    for (size_t i = 0; i < size; ++i) {
-        float diff = output_data[i] - target_data[i];
-        sum += diff * diff;
-    }
+    std::shared_ptr<Tensor> loss = [&]() -> std::shared_ptr<Tensor> {
+        try {
+            auto mse_op = std::make_shared<MseOp>(std::vector<std::shared_ptr<Tensor>>{model_output, target});
+            return mse_op->forward();
+        } catch (const std::exception &e) {
+            throw std::runtime_error(std::string("Loss::mse: MSE forward pass failed: ") + e.what());
+        };
+    }();
 
-    return sum / static_cast<float>(size);
+    std::shared_ptr<Tensor> mean_loss = [&]() -> std::shared_ptr<Tensor> {
+        try {
+            std::vector<std::shared_ptr<Tensor>> mean_inputs = {loss};
+            auto mean_op = std::make_shared<MeanOp>(mean_inputs);
+            return mean_op->forward();
+        } catch (const std::exception &e) {
+            throw std::runtime_error(std::string("Loss::mse: averaging loss failed: ") + e.what());
+        };
+    }();
+    return mean_loss;
 }

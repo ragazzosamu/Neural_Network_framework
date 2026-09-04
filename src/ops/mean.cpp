@@ -1,12 +1,12 @@
 
-#include "ops/average.hpp"
+#include "ops/mean.hpp"
 #include <stdexcept>
 
-std::shared_ptr<Tensor> AverageOp::forward() {
+std::shared_ptr<Tensor> MeanOp::forward() {
 
     // Check that there is exactly one input.
     if (o_inputs.size() != 1) {
-        throw std::invalid_argument("AverageOp expects exactly one input tensor");
+        throw std::invalid_argument("MeanOp expects exactly one input tensor");
     }
 
     auto &input_tensor = o_inputs[0];
@@ -31,16 +31,20 @@ std::shared_ptr<Tensor> AverageOp::forward() {
 
     auto output = std::make_shared<Tensor>(std::vector<size_t>{1});
     output->set_data(0, sum / static_cast<float>(input_size));
-    output->set_operation(shared_from_this());
+
+    if (input_tensor->requires_grad()) {
+        output->set_requires_grad(true);
+        output->set_operation(shared_from_this());
+    }
 
     return output;
 }
 
-void AverageOp::backward(std::shared_ptr<Tensor> grad) const {
+void MeanOp::backward(std::shared_ptr<Tensor> grad) const {
 
     // Same input count check used in forward().
     if (o_inputs.size() != 1) {
-        throw std::invalid_argument("AverageOp expects exactly one input tensor");
+        throw std::invalid_argument("MeanOp expects exactly one input tensor");
     }
 
     if (grad == nullptr) {

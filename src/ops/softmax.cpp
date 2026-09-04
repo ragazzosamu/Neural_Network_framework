@@ -62,10 +62,15 @@ std::shared_ptr<Tensor> SoftmaxOp::forward() {
         }
     }
 
+    if (input->requires_grad()) {
+        output.set_requires_grad(true);
+        output.set_operation(shared_from_this());
+    }
+
     // The output is needed again, unchanged, during backward() (see the
     // derivative formula there), so it's cached here.
-    saved_output = std::make_shared<Tensor>(output);
-    output.set_operation(shared_from_this());
+    saved_output = std::make_shared<Tensor>(output.clone());
+
     return std::make_shared<Tensor>(std::move(output));
 }
 

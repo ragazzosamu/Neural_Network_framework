@@ -79,6 +79,8 @@ class Tensor {
     void set_data(size_t i, float value);
     void add_to_data(size_t i, float value);
 
+    float item() const; // if the tensor has exactly one element, return it; otherwise throw.
+
     const std::shared_ptr<Tensor> &get_grad() const;
     void set_grad(std::shared_ptr<Tensor> new_grad);
 

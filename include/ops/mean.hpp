@@ -2,7 +2,7 @@
 
 #include "ops/operation.hpp"
 
-class AverageOp : public Operation {
+class MeanOp : public Operation {
   public:
     using Operation::Operation;
 
