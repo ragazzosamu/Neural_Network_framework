@@ -68,7 +68,7 @@ std::shared_ptr<Tensor> Loss::cross_entropy() {
     std::shared_ptr<Tensor> mean_loss = [&]() -> std::shared_ptr<Tensor> {
         try {
             std::vector<std::shared_ptr<Tensor>> mean_inputs = {loss};
-            auto mean_op = std::make_shared<AverageOp>(mean_inputs);
+            auto mean_op = std::make_shared<MeanOp>(mean_inputs);
             return mean_op->forward();
         } catch (const std::exception &e) {
             throw std::runtime_error(std::string("Loss::cross_entropy: averaging loss failed: ") + e.what());
@@ -105,7 +105,7 @@ std::shared_ptr<Tensor> Loss::mse() {
     std::shared_ptr<Tensor> mean_loss = [&]() -> std::shared_ptr<Tensor> {
         try {
             std::vector<std::shared_ptr<Tensor>> mean_inputs = {loss};
-            auto mean_op = std::make_shared<AverageOp>(mean_inputs);
+            auto mean_op = std::make_shared<MeanOp>(mean_inputs);
             return mean_op->forward();
         } catch (const std::exception &e) {
             throw std::runtime_error(std::string("Loss::mse: averaging loss failed: ") + e.what());
