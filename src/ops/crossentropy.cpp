@@ -69,7 +69,11 @@ std::shared_ptr<Tensor> CrossEntropyOp::forward() {
         loss.set_data(i, -sum);
     }
 
-    loss.set_operation(shared_from_this());
+    if (model_output->requires_grad() || target->requires_grad()) {
+        loss.set_requires_grad(true);
+        loss.set_operation(shared_from_this());
+    }
+
     return std::make_shared<Tensor>(std::move(loss));
 }
 

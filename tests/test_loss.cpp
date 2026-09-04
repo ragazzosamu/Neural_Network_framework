@@ -59,7 +59,7 @@ TEST_CASE("mse computes the correct value for known inputs", "[loss][mse]") {
     // diffs: 0, 1, 2, 3 -> squared: 0, 1, 4, 9 -> mean = 14 / 4 = 3.5
     Loss loss({output, target});
 
-    REQUIRE(loss.mse() == Catch::Approx(3.5f));
+    REQUIRE(loss.mse()->item() == Catch::Approx(3.5f));
 }
 
 TEST_CASE("mse is zero when output equals target", "[loss][mse]") {
@@ -67,7 +67,7 @@ TEST_CASE("mse is zero when output equals target", "[loss][mse]") {
     auto target = make_tensor({3}, {0.5f, -1.0f, 2.0f});
     Loss loss({output, target});
 
-    REQUIRE(loss.mse() == Catch::Approx(0.0f));
+    REQUIRE(loss.mse()->item() == Catch::Approx(0.0f));
 }
 
 TEST_CASE("mse throws on size mismatch between output and target", "[loss][mse][exceptions]") {
@@ -119,7 +119,7 @@ TEST_CASE("cross_entropy matches the hand-computed value for a one-hot target", 
     auto target = make_tensor({1, 3}, {1.0f, 0.0f, 0.0f});
     Loss loss({output, target});
 
-    REQUIRE(loss.cross_entropy() == Catch::Approx(0.41702986f).epsilon(1e-4));
+    REQUIRE(loss.cross_entropy()->item() == Catch::Approx(0.41702986f).epsilon(1e-4));
 }
 
 TEST_CASE("cross_entropy assigns lower loss to a more confident correct prediction", "[loss][cross_entropy]") {
@@ -133,7 +133,7 @@ TEST_CASE("cross_entropy assigns lower loss to a more confident correct predicti
     Loss confident_loss({confident_output, target});
     Loss unsure_loss({unsure_output, target});
 
-    REQUIRE(confident_loss.cross_entropy() == Catch::Approx(0.01478325f).epsilon(1e-4));
-    REQUIRE(unsure_loss.cross_entropy() == Catch::Approx(1.00194258f).epsilon(1e-4));
-    REQUIRE(confident_loss.cross_entropy() < unsure_loss.cross_entropy());
+    REQUIRE(confident_loss.cross_entropy()->item() == Catch::Approx(0.01478325f).epsilon(1e-4));
+    REQUIRE(unsure_loss.cross_entropy()->item() == Catch::Approx(1.00194258f).epsilon(1e-4));
+    REQUIRE(confident_loss.cross_entropy()->item() < unsure_loss.cross_entropy()->item());
 }

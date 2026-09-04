@@ -7,10 +7,10 @@
 #include <stdexcept>
 #include <vector>
 
-#include "ops/average.hpp"
 #include "ops/crossentropy.hpp"
 #include "ops/matmul.hpp"
 #include "ops/matsum.hpp"
+#include "ops/mean.hpp"
 #include "ops/relu.hpp"
 #include "ops/softmax.hpp"
 

@@ -1,5 +1,5 @@
 
-#include "ops/average.hpp"
+#include "ops/mean.hpp"
 #include <stdexcept>
 
 std::shared_ptr<Tensor> AverageOp::forward() {
@@ -31,7 +31,11 @@ std::shared_ptr<Tensor> AverageOp::forward() {
 
     auto output = std::make_shared<Tensor>(std::vector<size_t>{1});
     output->set_data(0, sum / static_cast<float>(input_size));
-    output->set_operation(shared_from_this());
+
+    if (input_tensor->requires_grad()) {
+        output->set_requires_grad(true);
+        output->set_operation(shared_from_this());
+    }
 
     return output;
 }

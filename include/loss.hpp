@@ -2,6 +2,8 @@
 
 #include "core/tensor.hpp"
 #include "ops/crossentropy.hpp"
+#include "ops/mean.hpp"
+#include "ops/mse.hpp"
 #include "ops/softmax.hpp"
 
 #include <memory>
@@ -38,15 +40,16 @@ class Loss {
     /// @throws std::runtime_error if the softmax or cross-entropy forward
     ///         pass fails, or if the resulting loss tensor is empty
     ///         (which would otherwise cause a division by zero).
-    float cross_entropy();
+    std::shared_ptr<Tensor> cross_entropy();
 
-    /// @brief Mean squared error between model output and target.
+    /// @brief  Computes the (row-wise) mean squared error
+    ///         between a row of predicted values and a row of target values.
     /// @return The mean squared error.
     /// @throws std::invalid_argument if the model output and target sizes
     ///         do not match.
     /// @throws std::runtime_error if the input tensors are empty (which
     ///         would otherwise cause a division by zero).
-    float mse();
+    std::shared_ptr<Tensor> mse();
 
   private:
     /// Validates that both stored tensors are non-null and have matching
