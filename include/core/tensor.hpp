@@ -79,7 +79,7 @@ class Tensor {
     void set_data(size_t i, float value);
     void add_to_data(size_t i, float value);
 
-    std::shared_ptr<Tensor> get_grad() const;
+    const std::shared_ptr<Tensor> &get_grad() const;
     void set_grad(std::shared_ptr<Tensor> new_grad);
 
     void set_operation(std::shared_ptr<Operation> operation);

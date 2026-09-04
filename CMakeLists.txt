@@ -31,7 +31,8 @@ add_library(operations_lib
             src/ops/matmul.cpp
             src/ops/relu.cpp
             src/ops/softmax.cpp
-            src/ops/crossentropy.cpp)
+            src/ops/crossentropy.cpp
+            src/ops/average.cpp)
 target_include_directories(operations_lib PUBLIC include)
 
 add_library(loss_lib
