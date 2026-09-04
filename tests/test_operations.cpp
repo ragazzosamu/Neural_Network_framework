@@ -390,22 +390,22 @@ TEST_CASE("AverageOp: forward", "[operation][average][forward]") {
         auto X = make_tensor({4}, {1, 2, 3, 4});
         auto op = std::make_shared<AverageOp>(std::vector<std::shared_ptr<Tensor>>{X});
         auto Y = op->forward();
-        REQUIRE(Y.size() == 1);
-        REQUIRE(Y.data()[0] == Approx(2.5f));
+        REQUIRE(Y->size() == 1);
+        REQUIRE(Y->data()[0] == Approx(2.5f));
     }
 
     SECTION("average of a single element equals the element itself") {
         auto X = make_tensor({1}, {7});
         auto op = std::make_shared<AverageOp>(std::vector<std::shared_ptr<Tensor>>{X});
         auto Y = op->forward();
-        REQUIRE(Y.data()[0] == Approx(7.0f));
+        REQUIRE(Y->data()[0] == Approx(7.0f));
     }
 
     SECTION("handles negative values correctly") {
         auto X = make_tensor({3}, {-1, 0, 1});
         auto op = std::make_shared<AverageOp>(std::vector<std::shared_ptr<Tensor>>{X});
         auto Y = op->forward();
-        REQUIRE(Y.data()[0] == Approx(0.0f));
+        REQUIRE(Y->data()[0] == Approx(0.0f));
     }
 }
 
