@@ -1,9 +1,8 @@
-#pragma once
 
 #include "ops/average.hpp"
 #include <stdexcept>
 
-Tensor AverageOp::forward() {
+std::shared_ptr<Tensor> AverageOp::forward() {
 
     // Check that there is exactly one input.
     if (o_inputs.size() != 1) {
@@ -30,9 +29,9 @@ Tensor AverageOp::forward() {
         sum += input_data[i];
     }
 
-    Tensor output({1});
-    output.set_data(0, sum / static_cast<float>(input_size));
-    output.set_operation(shared_from_this());
+    auto output = std::make_shared<Tensor>(std::vector<size_t>{1});
+    output->set_data(0, sum / static_cast<float>(input_size));
+    output->set_operation(shared_from_this());
 
     return output;
 }
