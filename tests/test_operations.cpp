@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <vector>
 
+#include "average.hpp"
 #include "crossentropy.hpp"
 #include "matmul.hpp"
 #include "matsum.hpp"
@@ -376,6 +377,86 @@ TEST_CASE("SoftmaxOp: exceptions", "[operation][softmax][exceptions]") {
         auto X = make_tensor({3}, {1, 2, 3});
         auto dY = make_tensor({3}, {1, 0, 0});
         auto op = std::make_shared<SoftmaxOp>(std::vector<std::shared_ptr<Tensor>>{X, X});
+        REQUIRE_THROWS_AS(op->backward(dY), std::invalid_argument);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AverageOp
+// ---------------------------------------------------------------------------
+
+TEST_CASE("AverageOp: forward", "[operation][average][forward]") {
+    SECTION("computes average of multiple elements") {
+        auto X = make_tensor({4}, {1, 2, 3, 4});
+        auto op = std::make_shared<AverageOp>(std::vector<std::shared_ptr<Tensor>>{X});
+        auto Y = op->forward();
+        REQUIRE(Y.size() == 1);
+        REQUIRE(Y.data()[0] == Approx(2.5f));
+    }
+
+    SECTION("average of a single element equals the element itself") {
+        auto X = make_tensor({1}, {7});
+        auto op = std::make_shared<AverageOp>(std::vector<std::shared_ptr<Tensor>>{X});
+        auto Y = op->forward();
+        REQUIRE(Y.data()[0] == Approx(7.0f));
+    }
+
+    SECTION("handles negative values correctly") {
+        auto X = make_tensor({3}, {-1, 0, 1});
+        auto op = std::make_shared<AverageOp>(std::vector<std::shared_ptr<Tensor>>{X});
+        auto Y = op->forward();
+        REQUIRE(Y.data()[0] == Approx(0.0f));
+    }
+}
+
+TEST_CASE("AverageOp: backward", "[operation][average][backward]") {
+    SECTION("distributes gradient equally among inputs") {
+        auto X = make_tensor({4}, {1, 2, 3, 4});
+        auto op = std::make_shared<AverageOp>(std::vector<std::shared_ptr<Tensor>>{X});
+        op->forward();
+
+        auto dY = make_tensor({1}, {1});
+        op->backward(dY);
+
+        // Ogni elemento riceve grad / N
+        auto const &grad_data = X->get_grad()->data();
+        for (size_t i = 0; i < X->size(); ++i) {
+            REQUIRE(grad_data[i] == Approx(0.25f));
+        }
+    }
+}
+
+TEST_CASE("AverageOp: forward() exceptions", "[operation][average][exceptions][forward]") {
+    SECTION("null input in forward") {
+        auto op = std::make_shared<AverageOp>(std::vector<std::shared_ptr<Tensor>>{nullptr});
+        REQUIRE_THROWS_AS(op->forward(), std::invalid_argument);
+    }
+
+    SECTION("wrong number of inputs in forward") {
+        auto X = make_tensor({3}, {1, 2, 3});
+        auto op = std::make_shared<AverageOp>(std::vector<std::shared_ptr<Tensor>>{X, X});
+        REQUIRE_THROWS_AS(op->forward(), std::invalid_argument);
+    }
+
+    SECTION("empty input tensor causes division by zero") {
+        auto X = make_tensor({0}, {});
+        auto op = std::make_shared<AverageOp>(std::vector<std::shared_ptr<Tensor>>{X});
+        REQUIRE_THROWS_AS(op->forward(), std::invalid_argument);
+    }
+}
+
+TEST_CASE("AverageOp: backward() exceptions", "[operation][average][exceptions][backward]") {
+    SECTION("null gradient in backward") {
+        auto X = make_tensor({3}, {1, 2, 3});
+        auto op = std::make_shared<AverageOp>(std::vector<std::shared_ptr<Tensor>>{X});
+        op->forward();
+        REQUIRE_THROWS_AS(op->backward(nullptr), std::invalid_argument);
+    }
+
+    SECTION("wrong number of inputs in backward") {
+        auto X = make_tensor({3}, {1, 2, 3});
+        auto dY = make_tensor({1}, {1});
+        auto op = std::make_shared<AverageOp>(std::vector<std::shared_ptr<Tensor>>{X, X});
         REQUIRE_THROWS_AS(op->backward(dY), std::invalid_argument);
     }
 }
