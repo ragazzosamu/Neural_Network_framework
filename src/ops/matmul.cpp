@@ -71,14 +71,14 @@ std::shared_ptr<Tensor> MatMulOp::forward() {
     size_t A_row_number = shapeA[maxRank - 2];
     size_t B_column_number = shapeB[maxRank - 1];
 
-    size_t stride_column_A = tensorA->strides()[maxRank - 1];
-    size_t stride_row_A = tensorA->strides()[maxRank - 2];
+    size_t stride_column_A = stridesA[maxRank - 1];
+    size_t stride_row_A = stridesA[maxRank - 2];
 
-    size_t stride_column_B = tensorB->strides()[maxRank - 1];
-    size_t stride_row_B = tensorB->strides()[maxRank - 2];
+    size_t stride_column_B = stridesB[maxRank - 1];
+    size_t stride_row_B = stridesB[maxRank - 2];
 
-    size_t stride_column_output = output.strides()[maxRank - 1];
-    size_t stride_row_output = output.strides()[maxRank - 2];
+    size_t stride_column_output = stridesOutput[maxRank - 1];
+    size_t stride_row_output = stridesOutput[maxRank - 2];
 
     // A zero-sized row/column dimension would make the division below
     // (0 / 0, or output_size / 0) undefined behaviour instead of just an empty result.

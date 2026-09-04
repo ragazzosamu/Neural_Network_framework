@@ -477,8 +477,7 @@ TEST_CASE("CrossEntropyOp: backward() exceptions", "[operation][crossentropy][ex
 // Chaining two operations: MatSumOp -> ReluOp
 // ---------------------------------------------------------------------------
 // Checks that the pointer saved by set_operation() / o_inputs is enough to
-// manually chain two backward() calls and get correct gradients, without
-// any dedicated autograd engine driving the graph.
+// manually chain two backward() calls and get correct gradients.
 TEST_CASE("Chaining MatSumOp -> ReluOp propagates gradients through both ops", "[operation][chain][matsum][relu]") {
     auto A = make_tensor({2, 2}, {1, -5, 3, 4});
     auto B = make_tensor({2, 2}, {1, 1, 1, 1});

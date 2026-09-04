@@ -1,8 +1,8 @@
 #pragma once
 
-#include "crossentropy.hpp"
-#include "softmax.hpp"
-#include "tensor.hpp"
+#include "core/tensor.hpp"
+#include "ops/crossentropy.hpp"
+#include "ops/softmax.hpp"
 
 #include <memory>
 #include <vector>

@@ -23,23 +23,32 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(Catch2) #Catch2::Catch2
 
 add_library(tensor_lib
-            src/tensor.cpp)
+            src/core/tensor.cpp)
 target_include_directories(tensor_lib PUBLIC include)
 
 add_library(operations_lib
-            src/matsum.cpp
-            src/matmul.cpp
-            src/relu.cpp
-            src/softmax.cpp
-            src/crossentropy.cpp)
+            src/ops/matsum.cpp
+            src/ops/matmul.cpp
+            src/ops/relu.cpp
+            src/ops/softmax.cpp
+            src/ops/crossentropy.cpp)
 target_include_directories(operations_lib PUBLIC include)
 
 add_library(loss_lib
             src/loss.cpp)
-
+            
 target_include_directories(loss_lib PUBLIC include)
 target_link_libraries(loss_lib PUBLIC operations_lib)
 target_link_libraries(loss_lib PUBLIC tensor_lib)
+
+add_library(nn_lib
+            src/nn/linear.cpp
+            src/nn/sequential.cpp
+            src/nn/relu.cpp)
+
+target_include_directories(nn_lib PUBLIC include)
+target_link_libraries(nn_lib PUBLIC operations_lib)
+target_link_libraries(nn_lib PUBLIC tensor_lib)
 
 add_executable(TensorTest tests/test_tensor.cpp)
 target_link_libraries(TensorTest PRIVATE tensor_lib)
@@ -55,4 +64,6 @@ add_executable(LossTest tests/test_loss.cpp)
 target_link_libraries(LossTest PRIVATE loss_lib)
 target_link_libraries(LossTest PRIVATE Catch2::Catch2WithMain)
 
-
+add_executable(ModuleTest tests/test_modules.cpp)
+target_link_libraries(ModuleTest PRIVATE nn_lib)
+target_link_libraries(ModuleTest PRIVATE Catch2::Catch2WithMain)

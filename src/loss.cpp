@@ -45,7 +45,7 @@ float Loss::cross_entropy() {
         // tensor in a single-element vector.
         std::vector<std::shared_ptr<Tensor>> softmax_inputs = {model_output};
         auto softmax = std::make_shared<SoftmaxOp>(softmax_inputs);
-        softmax_output = std::make_shared<Tensor>(softmax->forward());
+        softmax_output = softmax->forward();
     } catch (const std::exception &e) {
         throw std::runtime_error(std::string("Loss::cross_entropy: softmax forward pass failed: ") + e.what());
     }
