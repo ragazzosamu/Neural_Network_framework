@@ -1,4 +1,4 @@
-#include "optimizer/Adam.hpp"
+#include "optimizer/adam.hpp"
 
 void Adam::step() {
 
