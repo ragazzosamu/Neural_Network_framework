@@ -99,6 +99,7 @@ void Tensor::add_to_data(size_t i, float value) { t_data[i] += value; }
 const std::shared_ptr<Tensor> &Tensor::get_grad() const { return grad; }
 void Tensor::set_grad(std::shared_ptr<Tensor> new_grad) { grad = std::move(new_grad); }
 
+const std::shared_ptr<Operation> &Tensor::get_operation() const { return t_operation; }
 void Tensor::set_operation(std::shared_ptr<Operation> operation) { t_operation = std::move(operation); }
 
 float Tensor::item() const {
