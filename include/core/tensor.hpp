@@ -84,6 +84,7 @@ class Tensor {
     const std::shared_ptr<Tensor> &get_grad() const;
     void set_grad(std::shared_ptr<Tensor> new_grad);
 
+    const std::shared_ptr<Operation> &get_operation() const;
     void set_operation(std::shared_ptr<Operation> operation);
 
   private:

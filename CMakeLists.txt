@@ -52,6 +52,12 @@ target_include_directories(nn_lib PUBLIC include)
 target_link_libraries(nn_lib PUBLIC operations_lib)
 target_link_libraries(nn_lib PUBLIC tensor_lib)
 
+add_library(optimizer_lib
+            src/optimizer/sgd.cpp
+            src/optimizer/adam.cpp)
+target_include_directories(optimizer_lib PUBLIC include)
+target_link_libraries(optimizer_lib PUBLIC tensor_lib)
+
 add_executable(TensorTest tests/test_tensor.cpp)
 target_link_libraries(TensorTest PRIVATE tensor_lib)
 target_link_libraries(TensorTest PRIVATE Catch2::Catch2WithMain)
@@ -69,3 +75,7 @@ target_link_libraries(LossTest PRIVATE Catch2::Catch2WithMain)
 add_executable(ModuleTest tests/test_modules.cpp)
 target_link_libraries(ModuleTest PRIVATE nn_lib)
 target_link_libraries(ModuleTest PRIVATE Catch2::Catch2WithMain)
+
+add_executable(OptimizerTest tests/test_optimizer.cpp)
+target_link_libraries(OptimizerTest PRIVATE optimizer_lib nn_lib operations_lib tensor_lib)
+target_link_libraries(OptimizerTest PRIVATE Catch2::Catch2WithMain)

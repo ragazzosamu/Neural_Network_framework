@@ -1,5 +1,5 @@
-#include "loss.hpp";
 
+#include "loss.hpp"
 #include <stdexcept>
 #include <string>
 
