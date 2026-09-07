@@ -9,7 +9,7 @@
 #include "nn/linear.hpp"
 #include "nn/module.hpp"
 #include "nn/sequential.hpp"
-#include "optimizer/Adam.hpp"
+#include "optimizer/adam.hpp"
 #include "optimizer/sgd.hpp"
 
 using Catch::Approx;
