@@ -35,7 +35,7 @@ jobs:
             ./build/OperationTest
             ./build/LossTest
             ./build/OptimizerTest
-            ./build/ModelTest
+            ./build/ModuleTest
 
 
         - name: Test Windows
@@ -45,5 +45,5 @@ jobs:
             ./build/Release/OperationTest.exe
             ./build/Release/LossTest.exe
             ./build/Release/OptimizerTest.exe
-            ./build/Release/ModelTest.exe
+            ./build/Release/ModuleTest.exe
 
