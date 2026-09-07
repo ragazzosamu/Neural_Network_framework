@@ -33,10 +33,17 @@ jobs:
           run: |
             ./build/TensorTest
             ./build/OperationTest
+            ./build/LossTest
+            ./build/OptimizerTest
+            ./build/ModelTest
+
 
         - name: Test Windows
           if: runner.os == 'Windows'
           run: |
             ./build/Release/TensorTest.exe
             ./build/Release/OperationTest.exe
+            ./build/Release/LossTest.exe
+            ./build/Release/OptimizerTest.exe
+            ./build/Release/ModelTest.exe
 
