@@ -2,8 +2,11 @@
 #include <catch2/matchers/catch_matchers_string.hpp>
 
 #include <algorithm>
+#include <cstdio>
 #include <exception> // std::rethrow_if_nested
+#include <fstream>
 #include <memory>
+#include <sstream>
 #include <vector>
 
 #include "core/tensor.hpp"
@@ -120,6 +123,28 @@ TEST_CASE("Sequential: modules() returns every sub-module, in order", "[nn][sequ
     REQUIRE(actual[0] == std::static_pointer_cast<Module>(net.linear1));
     REQUIRE(actual[1] == std::static_pointer_cast<Module>(net.relu));
     REQUIRE(actual[2] == std::static_pointer_cast<Module>(net.linear2));
+}
+
+TEST_CASE("Module::save_gradients writes a hierarchical JSON state", "[nn][module]") {
+    TestNetwork net;
+    const std::string filename = "save_gradients_test.json";
+    auto gradient = std::make_shared<Tensor>(std::vector<size_t>{4, 8});
+    gradient->set_data(0, 3.5f);
+    net.linear1->parameters()[0]->set_grad(gradient);
+
+    REQUIRE_NOTHROW(net.save_gradients(filename));
+
+    std::ifstream input(filename);
+    std::stringstream contents;
+    contents << input.rdbuf();
+    const std::string json = contents.str();
+
+    REQUIRE(json.find("module_0/module_0/param_0") != std::string::npos);
+    REQUIRE(json.find("\"shape\": [4, 8]") != std::string::npos);
+    REQUIRE(json.find("\"values\": [3.5") != std::string::npos);
+    REQUIRE(json.find("\"module_0/module_0/param_1\": null") != std::string::npos);
+
+    std::remove(filename.c_str());
 }
 
 TEST_CASE("Module::add_module rejects a null sub-module", "[nn][module]") {

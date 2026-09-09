@@ -1,7 +1,5 @@
 #include "core/tensor.hpp"
-#include <algorithm>
-#include <stdexcept>
-#include <string>
+#include "ops/operation.hpp"
 
 using std::vector;
 
@@ -83,6 +81,30 @@ Tensor Tensor::clone() const {
     return cloned;
 }
 
+// ---------- Backward ----------
+void Tensor::backward() {
+    if (!t_require_grad) {
+        throw std::runtime_error("Cannot call backward() on a tensor that does not require gradients");
+    }
+
+    if (grad == nullptr) {
+        throw std::runtime_error("Cannot call backward() on a tensor with no gradient");
+    }
+
+    std::vector<std::shared_ptr<Operation>> computational_graph_list;
+    // map each operation with its output
+    //  use this map both for visited checking and to find the right gradient for the backward
+    OpToOutputMap op_to_output;
+
+    createComputationalgraph(computational_graph_list, shared_from_this(), op_to_output);
+
+    for (auto it = computational_graph_list.rbegin(); it != computational_graph_list.rend(); ++it) {
+        auto op = *it;
+        auto output_tensor = op_to_output[op];
+        op->backward(output_tensor->get_grad());
+    }
+}
+
 // ---------- Accessor ----------
 
 bool Tensor::requires_grad() const { return t_require_grad; }
@@ -130,4 +152,25 @@ size_t Tensor::computeTotalSize(const vector<size_t> &shape) {
         size *= dim;
     }
     return size;
+}
+
+void Tensor::createComputationalgraph(std::vector<std::shared_ptr<Operation>> &computational_graph, std::shared_ptr<Tensor> tensor,
+                                      OpToOutputMap &op_to_output) {
+
+    if (!tensor)
+        return;
+    auto op = tensor->get_operation();
+
+    if (!op || op_to_output.find(op) != op_to_output.end())
+        return;
+
+    auto &op_inputs = op->inputs();
+    op_to_output[op] = tensor;
+    // create the graph recursively
+    // First append the inputs and then the operation, in this way every output has its inputs on the left
+    for (auto &input : op_inputs) {
+        createComputationalgraph(computational_graph, input, op_to_output);
+    }
+    // Appended to the end because it is more efficient than inserting at the front
+    computational_graph.push_back(op);
 }

@@ -23,7 +23,8 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(Catch2) #Catch2::Catch2
 
 add_library(tensor_lib
-            src/core/tensor.cpp)
+            src/core/tensor.cpp
+            src/core/rng.cpp)
 target_include_directories(tensor_lib PUBLIC include)
 
 add_library(operations_lib
@@ -79,3 +80,8 @@ target_link_libraries(ModuleTest PRIVATE Catch2::Catch2WithMain)
 add_executable(OptimizerTest tests/test_optimizer.cpp)
 target_link_libraries(OptimizerTest PRIVATE optimizer_lib nn_lib operations_lib tensor_lib)
 target_link_libraries(OptimizerTest PRIVATE Catch2::Catch2WithMain)
+
+add_executable(XORTest tests/test_xor.cpp)
+target_link_libraries(XORTest PRIVATE optimizer_lib nn_lib operations_lib tensor_lib loss_lib)
+target_link_libraries(XORTest PRIVATE Catch2::Catch2WithMain)
+

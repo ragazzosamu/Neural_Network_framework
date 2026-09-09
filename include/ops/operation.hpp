@@ -13,7 +13,7 @@ class Operation : public std::enable_shared_from_this<Operation> {
 
     virtual void backward(std::shared_ptr<Tensor> grad) const = 0;
 
-    virtual std::vector<std::shared_ptr<Tensor>> inputs() const { return o_inputs; }
+    virtual const std::vector<std::shared_ptr<Tensor>> &inputs() const { return o_inputs; }
 
   protected:
     std::vector<std::shared_ptr<Tensor>> o_inputs;
