@@ -1,12 +1,19 @@
 #pragma once
 
-#include "ops/operation.hpp"
+#include <algorithm>
 #include <cstddef>
 #include <memory>
+#include <stdexcept>
+#include <string>
+#include <unordered_map>
 #include <vector>
 using std::vector;
 
+class Tensor;
 class Operation; // Forward declaration di Operation
+
+using OpToOutputMap = std::unordered_map<std::shared_ptr<Operation>, std::shared_ptr<Tensor>>;
+
 /**
  * @brief A dense n-dimensional array with autograd support.
  *
@@ -15,7 +22,7 @@ class Operation; // Forward declaration di Operation
  * transpose() and permute() share the same buffer, while
  * clone() allocates a fully independent buffer.
  */
-class Tensor {
+class Tensor : public std::enable_shared_from_this<Tensor> {
   public:
     /**
      * @brief Allocates a new zero-initialized tensor with the given shape.
@@ -69,6 +76,8 @@ class Tensor {
      */
     Tensor clone() const;
 
+    void backward();
+
     bool requires_grad() const;
     void set_requires_grad(bool req);
 
@@ -101,4 +110,7 @@ class Tensor {
 
     /// @brief Product of all dimensions in @p shape.
     static size_t computeTotalSize(const vector<size_t> &shape);
+
+    void createComputationalgraph(std::vector<std::shared_ptr<Operation>> &computational_graph, std::shared_ptr<Tensor> tensor,
+                                  OpToOutputMap &op_to_output);
 };

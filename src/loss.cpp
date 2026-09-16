@@ -3,45 +3,28 @@
 #include <stdexcept>
 #include <string>
 
-Loss::Loss(std::vector<std::shared_ptr<Tensor>> inputs) : l_inputs(std::move(inputs)) {
-    if (l_inputs.size() != 2) {
-        throw std::invalid_argument("Loss: expected exactly 2 inputs (model output, target), got " + std::to_string(l_inputs.size()));
-    }
-    if (!l_inputs[0] || !l_inputs[1]) {
-        throw std::invalid_argument("Loss: model output and target tensors must not be null");
-    }
-}
-
-void Loss::validate_inputs() const {
-    // These first two checks are defensive: the constructor already
-    // guarantees them, but re-checking here keeps each public method
-    // self-contained and safe even if that invariant is ever relaxed.
-    if (!l_inputs[0] || !l_inputs[1]) {
+void Loss::validate_inputs(std::shared_ptr<Tensor> &model_output, std::shared_ptr<Tensor> &target) {
+    if (!model_output || !target) {
         throw std::invalid_argument("Loss: model output and target tensors must not be null");
     }
     // Shape equality (not just matching total size) mirrors the check
     // CrossEntropyOp::forward() does internally, and also catches cases
     // like {2,3} vs {3,2} that have the same element count but are not
     // actually compatible.
-    if (l_inputs[0]->shape() != l_inputs[1]->shape()) {
-        throw std::invalid_argument("Loss: model output and target shape mismatch (sizes " + std::to_string(l_inputs[0]->size()) + " vs " +
-                                    std::to_string(l_inputs[1]->size()) + ")");
+    if (model_output->shape() != target->shape()) {
+        throw std::invalid_argument("Loss: model output and target shape mismatch (sizes " + std::to_string(model_output->size()) + " vs " +
+                                    std::to_string(target->size()) + ")");
     }
 }
 
-std::shared_ptr<Tensor> Loss::cross_entropy() {
-    validate_inputs();
-
-    auto const &model_output = l_inputs[0];
-    auto const &target = l_inputs[1];
+std::shared_ptr<Tensor> Loss::cross_entropy(std::shared_ptr<Tensor> &model_output, std::shared_ptr<Tensor> &target) {
+    validate_inputs(model_output, target);
 
     std::shared_ptr<Tensor> softmax_output;
     try {
         // SoftmaxOp's constructor  takes a vector of
         // inputs, and its forward() requires that vector to have exactly 1
-        // element. Passing l_inputs directly would compile (same type) but
-        // throw at runtime, since l_inputs has 2 elements (output, target).
-        // Softmax only ever needs the model output, so wrap just that one
+        // element, so wrap just that one
         // tensor in a single-element vector.
         std::vector<std::shared_ptr<Tensor>> softmax_inputs = {model_output};
         auto softmax = std::make_shared<SoftmaxOp>(softmax_inputs);
@@ -74,14 +57,13 @@ std::shared_ptr<Tensor> Loss::cross_entropy() {
             throw std::runtime_error(std::string("Loss::cross_entropy: averaging loss failed: ") + e.what());
         };
     }();
+
+    mean_loss->set_grad(std::make_shared<Tensor>(std::vector<size_t>{1}, std::shared_ptr<float[]>(new float[1]{1.0f}), false));
     return mean_loss;
 }
 
-std::shared_ptr<Tensor> Loss::mse() {
-    validate_inputs();
-
-    auto const &model_output = l_inputs[0];
-    auto const &target = l_inputs[1];
+std::shared_ptr<Tensor> Loss::mse(std::shared_ptr<Tensor> &model_output, std::shared_ptr<Tensor> &target) {
+    validate_inputs(model_output, target);
 
     auto const &output_data = model_output->data();
     auto const &target_data = target->data();
@@ -111,5 +93,7 @@ std::shared_ptr<Tensor> Loss::mse() {
             throw std::runtime_error(std::string("Loss::mse: averaging loss failed: ") + e.what());
         };
     }();
+
+    mean_loss->set_grad(std::make_shared<Tensor>(std::vector<size_t>{1}, std::shared_ptr<float[]>(new float[1]{1.0f}), false));
     return mean_loss;
 }

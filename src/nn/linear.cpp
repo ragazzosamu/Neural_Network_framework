@@ -1,4 +1,5 @@
 #include "nn/linear.hpp"
+#include "core/rng.hpp"
 #include "ops/matmul.hpp"
 #include "ops/matsum.hpp"
 
@@ -15,9 +16,8 @@ Linear::Linear(size_t input_size, size_t output_size) {
     // Random initialization: sampling from a standard normal distribution
     // avoids the symmetry issues of a constant initial weight (all neurons
     // would otherwise learn identical features).
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::normal_distribution<float> dis(0.0f, 1);
+    std::normal_distribution<float> dis(0.0f, 1.0f);
+    auto &gen = rng::engine();
 
     for (size_t i = 0; i < weights->size(); ++i) {
         weights->set_data(i, dis(gen));
