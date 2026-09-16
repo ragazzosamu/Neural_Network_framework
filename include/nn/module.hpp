@@ -236,6 +236,53 @@ class Module {
         }
     }
 
+    /**
+     * @brief Saves all parameter values to a numeric CSV file.
+     *
+     * Values are written one per row in the same depth-first order used by
+     * parameters(), so the file can be read directly with NumPy or pandas.
+     * The tensor shapes must be known separately when the values are loaded.
+     *
+     * @param filename Path of the CSV file to create or overwrite.
+     * @throws std::runtime_error if the file cannot be opened, written, or a
+     *         null parameter is encountered.
+     */
+    void save_weights(const std::string &filename) const {
+        std::ofstream output(filename);
+        if (!output) {
+            throw std::runtime_error("Module::save_weights: cannot open file " + filename);
+        }
+
+        // Write only numbers so pandas and NumPy can read the file directly.
+        auto write_tensor = [&](const std::shared_ptr<Tensor> &weight) {
+            if (!weight) {
+                throw std::runtime_error("Module::save_weights: cannot save a null parameter");
+            }
+
+            output << std::setprecision(std::numeric_limits<float>::max_digits10);
+            for (size_t i = 0; i < weight->size(); ++i) {
+                output << weight->data()[i];
+                output << '\n';
+            }
+        };
+
+        auto write_module = [&](const auto &self, const Module *module) -> void {
+            for (size_t i = 0; i < module->params.size(); ++i) {
+                const auto &parameter = module->params[i];
+                write_tensor(parameter);
+            }
+
+            for (size_t i = 0; i < module->sub_modules.size(); ++i) {
+                self(self, module->sub_modules[i].get());
+            }
+        };
+
+        write_module(write_module, this);
+        if (!output) {
+            throw std::runtime_error("Module::save_weights: failed while writing file " + filename);
+        }
+    }
+
   protected:
     /// Whether this module is currently in training mode (true) or
     /// evaluation mode (false). Defaults to training mode.

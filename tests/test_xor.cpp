@@ -3,6 +3,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <filesystem>
 #include <limits>
 #include <memory>
 #include <stdexcept>
@@ -21,6 +22,10 @@
 #include "nn/sequential.hpp"
 #include "optimizer/adam.hpp"
 #include "optimizer/sgd.hpp"
+
+#ifndef NEURAL_NETWORK_PROJECT_ROOT
+#define NEURAL_NETWORK_PROJECT_ROOT "."
+#endif
 
 class MyModel : public Module {
 
@@ -84,15 +89,14 @@ std::vector<std::vector<float>> X = {
 };
 
 // Target Y come indici di classe (per Cross-Entropy classica)
-std::vector<int> Y_labels = {
-    // Train Batch 1
-    0, 1, 1, 0, 0, 1, 1,
-    // Train Batch 2
-    0, 0, 1, 1, 0, 0, 1,
-    // Train Batch 3
-    1, 0, 0, 1, 1, 0, 0,
-    // Test Set
-    1, 1, 0, 0, 1, 1, 0, 0, 1};
+std::vector<int> Y_labels = {// Train Batch 1
+                             0, 1, 1, 0, 0, 1, 1,
+                             // Train Batch 2
+                             0, 0, 1, 1, 0, 0, 1,
+                             // Train Batch 3
+                             1, 0, 0, 1, 1, 0, 0,
+                             // Test Set
+                             1, 1, 0, 0, 1, 1, 0, 0, 1};
 
 void training_loop(std::shared_ptr<Tensor> &input, std::shared_ptr<Tensor> &target, std::shared_ptr<Tensor> &test_input,
                    std::shared_ptr<Tensor> &test_target, std::shared_ptr<Module> model) {
@@ -173,7 +177,7 @@ void training_loop(std::shared_ptr<Tensor> &input, std::shared_ptr<Tensor> &targ
         }
         test_accuracy = test_accuracy / static_cast<float>(evaluation_samples);
 
-        if ((i + 1) % 10 == 0) {
+        if ((i + 1) % 10 == 0 || i == 0) {
             std::cout << std::fixed << std::setprecision(4) << "[Epoch " << (i + 1) << "/" << epochs << "] "
                       << "train_loss: " << train_loss << " | train_acc: " << train_accuracy << " | test_loss: " << test_loss
                       << " | test_acc: " << test_accuracy << std::endl;
@@ -242,7 +246,17 @@ int main(int argc, char *argv[]) {
 
     auto model = std::make_shared<MyModel>();
     model->init_he();
+
+    const std::filesystem::path project_root = NEURAL_NETWORK_PROJECT_ROOT;
+    const std::filesystem::path weights_directory = project_root / "weights";
+    const std::filesystem::path gradients_directory = project_root / "gradients";
+
+    std::filesystem::create_directories(weights_directory);
+    model->save_weights((weights_directory / "xor_weights.csv").string());
     training_loop(input, target, test_input, test_target, model);
+
+    std::filesystem::create_directories(gradients_directory);
+    model->save_gradients((gradients_directory / "gradients_cpp.json").string());
 
     return 0;
 }

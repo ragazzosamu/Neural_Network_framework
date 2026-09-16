@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <exception> // std::rethrow_if_nested
+#include <filesystem>
 #include <fstream>
 #include <memory>
 #include <sstream>
@@ -127,7 +128,8 @@ TEST_CASE("Sequential: modules() returns every sub-module, in order", "[nn][sequ
 
 TEST_CASE("Module::save_gradients writes a hierarchical JSON state", "[nn][module]") {
     TestNetwork net;
-    const std::string filename = "save_gradients_test.json";
+    const std::string filename = "gradients/save_gradients_test.json";
+    std::filesystem::create_directories("gradients");
     auto gradient = std::make_shared<Tensor>(std::vector<size_t>{4, 8});
     gradient->set_data(0, 3.5f);
     net.linear1->parameters()[0]->set_grad(gradient);

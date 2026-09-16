@@ -63,3 +63,7 @@ lib/
 *.sln
 *.sw?
 .DS_Store
+
+
+gradients/
+weights/

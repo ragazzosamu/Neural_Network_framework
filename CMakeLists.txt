@@ -84,4 +84,5 @@ target_link_libraries(OptimizerTest PRIVATE Catch2::Catch2WithMain)
 add_executable(XORTest tests/test_xor.cpp)
 target_link_libraries(XORTest PRIVATE optimizer_lib nn_lib operations_lib tensor_lib loss_lib)
 target_link_libraries(XORTest PRIVATE Catch2::Catch2WithMain)
+target_compile_definitions(XORTest PRIVATE NEURAL_NETWORK_PROJECT_ROOT="${CMAKE_SOURCE_DIR}")
 
