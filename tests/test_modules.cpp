@@ -178,7 +178,7 @@ TEST_CASE("Linear::forward: shapes are correct and errors are wrapped as std::ru
         REQUIRE_THROWS_AS(linear.forward(nullptr), std::runtime_error);
     }
 
-    SECTION("preserves the original MatMulOp/MatSumOp exception as a nested exception") {
+    SECTION("preserves the original MatMulOp/MatAddOp exception as a nested exception") {
         Linear linear(4, 8);
         auto bad_input = std::make_shared<Tensor>(std::vector<size_t>{3, 1, 5}); // expected 4, got 5
 
@@ -190,7 +190,7 @@ TEST_CASE("Linear::forward: shapes are correct and errors are wrapped as std::ru
             // real error coming from MatMulOp is still there.
             try {
                 std::rethrow_if_nested(outer);
-                FAIL("Expected a nested exception from MatMulOp/MatSumOp, found none");
+                FAIL("Expected a nested exception from MatMulOp/MatAddOp, found none");
             } catch (const std::invalid_argument &inner) {
                 INFO("Original error preserved: " << inner.what());
                 SUCCEED();

@@ -6,7 +6,7 @@
  * @brief Operation node that computes C = relu(A) = max(0, A), element-wise.
  *
  * The single operand is read from Operation::o_inputs (o_inputs[0] = A).
- * Unlike MatMulOp/MatSumOp, this is a unary operation: it takes exactly one
+ * Unlike MatMulOp/MatAddOp, this is a unary operation: it takes exactly one
  * input tensor and involves no broadcasting.
  */
 class ReluOp : public Operation {

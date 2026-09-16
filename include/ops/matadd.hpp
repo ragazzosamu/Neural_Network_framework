@@ -12,7 +12,7 @@
  * last two dimensions: every axis follows the same broadcasting rules
  * (equal, or one of the two equal to 1).
  */
-class MatSumOp : public Operation {
+class MatAddOp : public Operation {
   public:
     using Operation::Operation;
 

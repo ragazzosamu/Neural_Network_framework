@@ -28,7 +28,7 @@ add_library(tensor_lib
 target_include_directories(tensor_lib PUBLIC include)
 
 add_library(operations_lib
-            src/ops/matsum.cpp
+            src/ops/matadd.cpp
             src/ops/matmul.cpp
             src/ops/relu.cpp
             src/ops/softmax.cpp

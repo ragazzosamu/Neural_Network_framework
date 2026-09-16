@@ -1,4 +1,4 @@
-#include "ops/matsum.hpp"
+#include "ops/matadd.hpp"
 #include <algorithm>
 #include <stdexcept>
 #include <vector>
@@ -6,7 +6,7 @@
 // Computes C = A + B element-wise, with NumPy-style broadcasting on every
 // dimension (unlike MatMulOp, there's no "special" last-two-dimensions
 // treatment here: every axis is broadcast the same way).
-std::shared_ptr<Tensor> MatSumOp::forward() {
+std::shared_ptr<Tensor> MatAddOp::forward() {
     if (o_inputs.size() != 2) {
         throw std::invalid_argument("The number of inputs must be 2");
     }
@@ -78,7 +78,7 @@ std::shared_ptr<Tensor> MatSumOp::forward() {
 // every broadcast position (via add_to_data, i.e. +=) is exactly what
 // "collapses" that axis back down, which is the correct gradient for a
 // broadcast sum.
-void MatSumOp::backward(std::shared_ptr<Tensor> grad) const {
+void MatAddOp::backward(std::shared_ptr<Tensor> grad) const {
     // Guard against a null gradient before dereferencing it below.
     if (grad == nullptr) {
         throw std::invalid_argument("Gradient tensor must not be null");
@@ -133,7 +133,7 @@ void MatSumOp::backward(std::shared_ptr<Tensor> grad) const {
 // Pads `strides` on the left with 0s up to `maxRank`, then zeroes out the
 // stride of every axis where `shape` is 1 (broadcast axis), so that iterating
 // along a broadcast axis always re-reads/re-writes the same element.
-std::vector<size_t> MatSumOp::broadcast_strides(const std::vector<size_t> &strides, const std::vector<size_t> &shape, size_t maxRank) {
+std::vector<size_t> MatAddOp::broadcast_strides(const std::vector<size_t> &strides, const std::vector<size_t> &shape, size_t maxRank) {
     std::vector<size_t> result = strides;
     result.insert(result.begin(), maxRank - result.size(), 0);
 
@@ -149,7 +149,7 @@ std::vector<size_t> MatSumOp::broadcast_strides(const std::vector<size_t> &strid
 // into per-dimension coordinates (row-major, starting from the last
 // dimension) and uses them, together with each tensor's broadcast strides,
 // to compute the corresponding memory offset in A and B.
-void MatSumOp::broadcast_offsets(size_t i, const std::vector<size_t> &outShape, const std::vector<size_t> &stridesA,
+void MatAddOp::broadcast_offsets(size_t i, const std::vector<size_t> &outShape, const std::vector<size_t> &stridesA,
                                  const std::vector<size_t> &stridesB, size_t &offsetA, size_t &offsetB) {
     size_t maxRank = outShape.size();
     size_t temp = i;

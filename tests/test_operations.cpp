@@ -9,7 +9,7 @@
 
 #include "ops/crossentropy.hpp"
 #include "ops/matmul.hpp"
-#include "ops/matsum.hpp"
+#include "ops/matadd.hpp"
 #include "ops/mean.hpp"
 #include "ops/relu.hpp"
 #include "ops/softmax.hpp"
@@ -137,13 +137,13 @@ TEST_CASE("MatMulOp: backward() exceptions", "[operation][matmul][exceptions][ba
 }
 
 // ---------------------------------------------------------------------------
-// MatSumOp
+// MatAddOp
 // ---------------------------------------------------------------------------
-TEST_CASE("MatSumOp: forward computes A + B element-wise", "[operation][matsum][forward]") {
+TEST_CASE("MatAddOp: forward computes A + B element-wise", "[operation][matadd][forward]") {
     auto A = make_tensor({2, 2}, {1, 2, 3, 4});
     auto B = make_tensor({2, 2}, {10, 20, 30, 40});
 
-    auto op = std::make_shared<MatSumOp>(std::vector<std::shared_ptr<Tensor>>{A, B});
+    auto op = std::make_shared<MatAddOp>(std::vector<std::shared_ptr<Tensor>>{A, B});
     auto C = op->forward();
 
     REQUIRE(C->data()[0] == Approx(11));
@@ -152,11 +152,11 @@ TEST_CASE("MatSumOp: forward computes A + B element-wise", "[operation][matsum][
     REQUIRE(C->data()[3] == Approx(44));
 }
 
-TEST_CASE("MatSumOp: backward with same-shape operands routes grad unchanged", "[operation][matsum][backward]") {
+TEST_CASE("MatAddOp: backward with same-shape operands routes grad unchanged", "[operation][matadd][backward]") {
     auto A = make_tensor({2, 2}, {1, 2, 3, 4});
     auto B = make_tensor({2, 2}, {10, 20, 30, 40});
 
-    auto op = std::make_shared<MatSumOp>(std::vector<std::shared_ptr<Tensor>>{A, B});
+    auto op = std::make_shared<MatAddOp>(std::vector<std::shared_ptr<Tensor>>{A, B});
     op->forward();
 
     auto dC = make_tensor({2, 2}, {1, 2, 3, 4});
@@ -168,11 +168,11 @@ TEST_CASE("MatSumOp: backward with same-shape operands routes grad unchanged", "
     }
 }
 
-TEST_CASE("MatSumOp: backward sums the gradient back over a broadcast axis", "[operation][matsum][backward][broadcast]") {
+TEST_CASE("MatAddOp: backward sums the gradient back over a broadcast axis", "[operation][matadd][backward][broadcast]") {
     auto A = make_tensor({2, 2}, {1, 2, 3, 4});
     auto B = make_tensor({1, 2}, {100, 200}); // broadcast over rows
 
-    auto op = std::make_shared<MatSumOp>(std::vector<std::shared_ptr<Tensor>>{A, B});
+    auto op = std::make_shared<MatAddOp>(std::vector<std::shared_ptr<Tensor>>{A, B});
     auto C = op->forward();
 
     REQUIRE(C->data()[0] == Approx(101));
@@ -192,40 +192,40 @@ TEST_CASE("MatSumOp: backward sums the gradient back over a broadcast axis", "[o
     REQUIRE(B->get_grad()->data()[1] == Approx(2));
 }
 
-TEST_CASE("MatSumOp: forward() exceptions", "[operation][matsum][exceptions][forward]") {
+TEST_CASE("MatAddOp: forward() exceptions", "[operation][matadd][exceptions][forward]") {
     auto A = make_tensor({2, 2}, {1, 2, 3, 4});
 
     SECTION("wrong number of inputs") {
-        auto op = std::make_shared<MatSumOp>(std::vector<std::shared_ptr<Tensor>>{A});
+        auto op = std::make_shared<MatAddOp>(std::vector<std::shared_ptr<Tensor>>{A});
         REQUIRE_THROWS_AS(op->forward(), std::invalid_argument);
     }
     SECTION("null input") {
-        auto op = std::make_shared<MatSumOp>(std::vector<std::shared_ptr<Tensor>>{A, nullptr});
+        auto op = std::make_shared<MatAddOp>(std::vector<std::shared_ptr<Tensor>>{A, nullptr});
         REQUIRE_THROWS_AS(op->forward(), std::invalid_argument);
     }
     SECTION("incompatible shapes") {
         auto C = make_tensor({3, 3}, std::vector<float>(9, 1.0f));
-        auto op = std::make_shared<MatSumOp>(std::vector<std::shared_ptr<Tensor>>{A, C});
+        auto op = std::make_shared<MatAddOp>(std::vector<std::shared_ptr<Tensor>>{A, C});
         REQUIRE_THROWS_AS(op->forward(), std::invalid_argument);
     }
 }
 
-TEST_CASE("MatSumOp: backward() exceptions", "[operation][matsum][exceptions][backward]") {
+TEST_CASE("MatAddOp: backward() exceptions", "[operation][matadd][exceptions][backward]") {
     auto A = make_tensor({2, 2}, {1, 2, 3, 4});
     auto B = make_tensor({2, 2}, {1, 1, 1, 1});
     auto dC = make_tensor({2, 2}, {1, 1, 1, 1});
 
     SECTION("null gradient") {
-        auto op = std::make_shared<MatSumOp>(std::vector<std::shared_ptr<Tensor>>{A, B});
+        auto op = std::make_shared<MatAddOp>(std::vector<std::shared_ptr<Tensor>>{A, B});
         op->forward();
         REQUIRE_THROWS_AS(op->backward(nullptr), std::invalid_argument);
     }
     SECTION("wrong number of inputs") {
-        auto op = std::make_shared<MatSumOp>(std::vector<std::shared_ptr<Tensor>>{A});
+        auto op = std::make_shared<MatAddOp>(std::vector<std::shared_ptr<Tensor>>{A});
         REQUIRE_THROWS_AS(op->backward(dC), std::invalid_argument);
     }
     SECTION("null input") {
-        auto op = std::make_shared<MatSumOp>(std::vector<std::shared_ptr<Tensor>>{A, nullptr});
+        auto op = std::make_shared<MatAddOp>(std::vector<std::shared_ptr<Tensor>>{A, nullptr});
         REQUIRE_THROWS_AS(op->backward(dC), std::invalid_argument);
     }
 }
@@ -520,15 +520,15 @@ TEST_CASE("CrossEntropyOp: backward() exceptions", "[operation][crossentropy][ex
 }
 
 // ---------------------------------------------------------------------------
-// Chaining two operations: MatSumOp -> ReluOp
+// Chaining two operations: MatAddOp -> ReluOp
 // ---------------------------------------------------------------------------
 // Checks that the pointer saved by set_operation() / o_inputs is enough to
 // manually chain two backward() calls and get correct gradients.
-TEST_CASE("Chaining MatSumOp -> ReluOp propagates gradients through both ops", "[operation][chain][matsum][relu]") {
+TEST_CASE("Chaining MatAddOp -> ReluOp propagates gradients through both ops", "[operation][chain][matadd][relu]") {
     auto A = make_tensor({2, 2}, {1, -5, 3, 4});
     auto B = make_tensor({2, 2}, {1, 1, 1, 1});
 
-    auto sumOp = std::make_shared<MatSumOp>(std::vector<std::shared_ptr<Tensor>>{A, B});
+    auto sumOp = std::make_shared<MatAddOp>(std::vector<std::shared_ptr<Tensor>>{A, B});
     auto S = sumOp->forward(); // S = A + B = [[2,-4],[4,5]]
 
     auto reluOp = std::make_shared<ReluOp>(std::vector<std::shared_ptr<Tensor>>{S});

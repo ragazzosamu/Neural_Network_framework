@@ -1,7 +1,7 @@
 #include "nn/linear.hpp"
 #include "core/rng.hpp"
 #include "ops/matmul.hpp"
-#include "ops/matsum.hpp"
+#include "ops/matadd.hpp"
 
 #include <random>
 
@@ -43,7 +43,7 @@ Linear::Linear(size_t input_size, size_t output_size) {
 // why weights are shaped {input_size, output_size} rather than
 // {output_size, input_size}.
 //
-// Any exception raised inside MatMulOp/MatSumOp (e.g. a shape mismatch, or
+// Any exception raised inside MatMulOp/MatAddOp (e.g. a shape mismatch, or
 // a null input reaching the multiplication) is caught and re-thrown as a
 // std::runtime_error prefixed with "Linear error: ". This gives callers a
 // single, predictable exception type to catch regardless of which internal
@@ -61,7 +61,7 @@ std::shared_ptr<Tensor> Linear::forward(const std::shared_ptr<Tensor> &input) co
         std::shared_ptr<Tensor> mul_output = multiplication->forward();
 
         auto sum_params = {params[1], mul_output};
-        std::shared_ptr<MatSumOp> sum = std::make_shared<MatSumOp>(sum_params);
+        std::shared_ptr<MatAddOp> sum = std::make_shared<MatAddOp>(sum_params);
         std::shared_ptr<Tensor> sum_output = sum->forward();
 
         return sum_output;
