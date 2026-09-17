@@ -120,7 +120,5 @@ The technical background and implementation decisions will be described in
 separate Medium articles. This README is intentionally focused on using the
 repository rather than explaining the underlying mathematics or architecture.
 
-- Article 1: _coming soon_
+- Article 1: https://medium.com/@ragazzosamuele7/from-zero-to-backprop-building-a-neural-network-framework-in-c-150677a84112?sharedUserId=ragazzosamuele7
 - Article 2: _coming soon_
-
-Links can be added here as the articles are published.
