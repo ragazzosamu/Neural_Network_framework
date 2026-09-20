@@ -90,6 +90,4 @@ target_link_libraries(XORTest PRIVATE optimizer_lib nn_lib operations_lib tensor
 target_link_libraries(XORTest PRIVATE Catch2::Catch2WithMain)
 target_compile_definitions(XORTest PRIVATE NEURAL_NETWORK_PROJECT_ROOT="${CMAKE_SOURCE_DIR}")
 
-add_executable(MnistTest examples/mnist_test.cpp)
-target_link_libraries(MnistTest PRIVATE tensor_lib)
 
