@@ -7,12 +7,15 @@
 #include <stdexcept>
 #include <vector>
 
+#include "ops/col2im.hpp"
 #include "ops/crossentropy.hpp"
-#include "ops/matmul.hpp"
+#include "ops/im2col.hpp"
 #include "ops/matadd.hpp"
+#include "ops/matmul.hpp"
 #include "ops/mean.hpp"
 #include "ops/relu.hpp"
 #include "ops/softmax.hpp"
+#include "ops/weight2col.hpp"
 
 using Catch::Approx;
 
@@ -27,6 +30,135 @@ static std::shared_ptr<Tensor> make_tensor(const std::vector<size_t> &shape, con
         t->set_data(i, values[i]);
     }
     return t;
+}
+
+// ---------------------------------------------------------------------------
+// Im2ColOp
+// ---------------------------------------------------------------------------
+TEST_CASE("Im2ColOp: forward extracts sliding patches", "[operation][im2col][forward]") {
+    auto input = make_tensor({2, 1, 3, 3}, {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18});
+    auto op = std::make_shared<im2ColOp>(std::vector<std::shared_ptr<Tensor>>{input}, 2, 2);
+
+    auto output = op->forward();
+
+    REQUIRE(output->shape() == std::vector<size_t>{2, 4, 4});
+    const std::vector<float> expected = {1, 2, 4, 5, 2, 3, 5, 6, 4, 5, 7, 8, 5, 6, 8, 9,
+                                         10, 11, 13, 14, 11, 12, 14, 15, 13, 14, 16, 17, 14, 15, 17, 18};
+    for (size_t i = 0; i < expected.size(); ++i) {
+        REQUIRE(output->data()[i] == Approx(expected[i]));
+    }
+}
+
+TEST_CASE("Im2ColOp: backward accumulates overlapping patches", "[operation][im2col][backward]") {
+    auto input = make_tensor({2, 1, 3, 3}, std::vector<float>(18, 1.0f));
+    auto op = std::make_shared<im2ColOp>(std::vector<std::shared_ptr<Tensor>>{input}, 2, 2);
+    op->forward();
+    auto grad = make_tensor({2, 4, 4}, std::vector<float>(32, 1.0f));
+
+    op->backward(grad);
+
+    const std::vector<float> expected = {1, 2, 1, 2, 4, 2, 1, 2, 1, 1, 2, 1, 2, 4, 2, 1, 2, 1};
+    REQUIRE(input->get_grad() != nullptr);
+    for (size_t i = 0; i < expected.size(); ++i) {
+        REQUIRE(input->get_grad()->data()[i] == Approx(expected[i]));
+    }
+}
+
+TEST_CASE("Im2ColOp: forward validates input and kernel", "[operation][im2col][exceptions]") {
+    auto input = make_tensor({1, 1, 3, 3}, std::vector<float>(9, 1.0f));
+
+    SECTION("wrong input rank") {
+        auto op = std::make_shared<im2ColOp>(std::vector<std::shared_ptr<Tensor>>{make_tensor({1, 3, 3}, std::vector<float>(9, 1.0f))}, 2, 2);
+        REQUIRE_THROWS_AS(op->forward(), std::invalid_argument);
+    }
+    SECTION("zero kernel dimension") {
+        auto op = std::make_shared<im2ColOp>(std::vector<std::shared_ptr<Tensor>>{input}, 0, 2);
+        REQUIRE_THROWS_AS(op->forward(), std::invalid_argument);
+    }
+    SECTION("kernel larger than input") {
+        auto op = std::make_shared<im2ColOp>(std::vector<std::shared_ptr<Tensor>>{input}, 4, 2);
+        REQUIRE_THROWS_AS(op->forward(), std::invalid_argument);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Weight2ColOp
+// ---------------------------------------------------------------------------
+TEST_CASE("Weight2ColOp: forward flattens each filter", "[operation][weight2col][forward]") {
+    auto weight = make_tensor({2, 1, 2, 2}, {1, 2, 3, 4, 5, 6, 7, 8});
+    auto op = std::make_shared<Weight2ColOp>(std::vector<std::shared_ptr<Tensor>>{weight});
+
+    auto output = op->forward();
+
+    REQUIRE(output->shape() == std::vector<size_t>{2, 4});
+    for (size_t i = 0; i < weight->size(); ++i) {
+        REQUIRE(output->data()[i] == Approx(weight->data()[i]));
+    }
+}
+
+TEST_CASE("Weight2ColOp: backward restores filter gradient", "[operation][weight2col][backward]") {
+    auto weight = make_tensor({2, 1, 2, 2}, {1, 2, 3, 4, 5, 6, 7, 8});
+    auto op = std::make_shared<Weight2ColOp>(std::vector<std::shared_ptr<Tensor>>{weight});
+    op->forward();
+    auto grad = make_tensor({2, 4}, {1, 2, 3, 4, 5, 6, 7, 8});
+
+    op->backward(grad);
+
+    REQUIRE(weight->get_grad() != nullptr);
+    for (size_t i = 0; i < weight->size(); ++i) {
+        REQUIRE(weight->get_grad()->data()[i] == Approx(grad->data()[i]));
+    }
+}
+
+TEST_CASE("Weight2ColOp: validates weight and gradient shapes", "[operation][weight2col][exceptions]") {
+    auto weight = make_tensor({2, 1, 2, 2}, std::vector<float>(8, 1.0f));
+    auto op = std::make_shared<Weight2ColOp>(std::vector<std::shared_ptr<Tensor>>{weight});
+    op->forward();
+
+    REQUIRE_THROWS_AS(op->backward(std::make_shared<Tensor>(std::vector<size_t>{2, 3})), std::invalid_argument);
+    auto invalid_weight_op = std::make_shared<Weight2ColOp>(std::vector<std::shared_ptr<Tensor>>{make_tensor({2, 4}, std::vector<float>(8, 1.0f))});
+    REQUIRE_THROWS_AS(invalid_weight_op->forward(), std::invalid_argument);
+}
+
+// ---------------------------------------------------------------------------
+// Col2ImOp
+// ---------------------------------------------------------------------------
+TEST_CASE("Col2ImOp: forward reshapes columns into feature maps", "[operation][col2im][forward]") {
+    auto input = make_tensor({2, 2, 6}, {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+                                         13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24});
+    auto op = std::make_shared<col2ImOp>(std::vector<std::shared_ptr<Tensor>>{input}, 2, 3);
+
+    auto output = op->forward();
+
+    REQUIRE(output->shape() == std::vector<size_t>{2, 2, 2, 3});
+    for (size_t i = 0; i < input->size(); ++i) {
+        REQUIRE(output->data()[i] == Approx(input->data()[i]));
+    }
+}
+
+TEST_CASE("Col2ImOp: backward flattens feature-map gradient", "[operation][col2im][backward]") {
+    auto input = make_tensor({2, 2, 6}, std::vector<float>(24, 1.0f));
+    auto op = std::make_shared<col2ImOp>(std::vector<std::shared_ptr<Tensor>>{input}, 2, 3);
+    op->forward();
+    auto grad = make_tensor({2, 2, 2, 3}, {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+                                           13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24});
+
+    op->backward(grad);
+
+    REQUIRE(input->get_grad() != nullptr);
+    for (size_t i = 0; i < input->size(); ++i) {
+        REQUIRE(input->get_grad()->data()[i] == Approx(grad->data()[i]));
+    }
+}
+
+TEST_CASE("Col2ImOp: validates output dimensions and gradient shape", "[operation][col2im][exceptions]") {
+    auto input = make_tensor({2, 2, 6}, std::vector<float>(24, 1.0f));
+    auto op = std::make_shared<col2ImOp>(std::vector<std::shared_ptr<Tensor>>{input}, 2, 3);
+    op->forward();
+
+    REQUIRE_THROWS_AS(op->backward(std::make_shared<Tensor>(std::vector<size_t>{2, 2, 3, 2})), std::invalid_argument);
+    auto invalid_dimensions_op = std::make_shared<col2ImOp>(std::vector<std::shared_ptr<Tensor>>{input}, 2, 2);
+    REQUIRE_THROWS_AS(invalid_dimensions_op->forward(), std::invalid_argument);
 }
 
 // ---------------------------------------------------------------------------

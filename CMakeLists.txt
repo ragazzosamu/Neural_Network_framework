@@ -34,8 +34,12 @@ add_library(operations_lib
             src/ops/softmax.cpp
             src/ops/crossentropy.cpp
             src/ops/mean.cpp
-            src/ops/mse.cpp)
+            src/ops/mse.cpp
+            src/ops/im2col.cpp
+            src/ops/col2im.cpp
+            src/ops/weight2col.cpp)
 target_include_directories(operations_lib PUBLIC include)
+target_link_libraries(operations_lib PUBLIC tensor_lib)
 
 add_library(loss_lib
             src/loss.cpp)
@@ -45,6 +49,7 @@ target_link_libraries(loss_lib PUBLIC operations_lib)
 target_link_libraries(loss_lib PUBLIC tensor_lib)
 
 add_library(nn_lib
+            src/nn/conv2D.cpp
             src/nn/linear.cpp
             src/nn/sequential.cpp
             src/nn/relu.cpp)
@@ -64,7 +69,6 @@ target_link_libraries(TensorTest PRIVATE tensor_lib)
 target_link_libraries(TensorTest PRIVATE Catch2::Catch2WithMain)
 
 add_executable(OperationTest tests/test_operations.cpp)
-target_link_libraries(operations_lib PUBLIC tensor_lib)
 target_link_libraries(OperationTest PRIVATE operations_lib tensor_lib)
 target_link_libraries(OperationTest PRIVATE Catch2::Catch2WithMain)
 
@@ -85,4 +89,7 @@ add_executable(XORTest tests/test_xor.cpp)
 target_link_libraries(XORTest PRIVATE optimizer_lib nn_lib operations_lib tensor_lib loss_lib)
 target_link_libraries(XORTest PRIVATE Catch2::Catch2WithMain)
 target_compile_definitions(XORTest PRIVATE NEURAL_NETWORK_PROJECT_ROOT="${CMAKE_SOURCE_DIR}")
+
+add_executable(MnistTest examples/mnist_test.cpp)
+target_link_libraries(MnistTest PRIVATE tensor_lib)
 

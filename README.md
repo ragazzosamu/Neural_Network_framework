@@ -87,6 +87,39 @@ On Windows:
 The experiment writes the initial weights to `weights/xor_weights.csv` and the
 resulting C++ gradients to `gradients/gradients_cpp.json`.
 
+## Profiling
+
+On Linux, profile the complete XOR training flow before optimizing it. The
+script builds `XORTest` in Release mode when requested, runs `perf stat`, and
+then writes a sampled hotspot report:
+
+```bash
+BUILD_DIR=build-linux bash scripts/profile.sh perf --build
+```
+
+When using WSL from a Windows checkout, install the Linux toolchain inside WSL
+and use a separate build directory from the existing Visual Studio build:
+
+```bash
+sudo apt update
+sudo apt install cmake g++ linux-tools-generic
+BUILD_DIR=build-linux bash scripts/profile.sh perf --build
+```
+
+Reports are saved under `profiling/`. Increase the statistical sample size
+with `PROFILE_RUNS=10 bash scripts/profile.sh perf`. If `perf` is unavailable,
+use Callgrind instead:
+
+```bash
+sudo apt install valgrind
+BUILD_DIR=build-linux bash scripts/profile.sh callgrind --build
+```
+
+`XORTest` is intentionally used because it exercises forward, loss,
+backpropagation, and optimizer code. Its workload is small, so for more stable
+hotspot percentages repeat the profiling command or replace the executable
+with a longer experiment after the first measurement.
+
 ## Optional Python Comparison
 
 The script in `python_scripts/test_xor.py` loads the generated weights into a
