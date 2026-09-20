@@ -1,7 +1,7 @@
 #include "nn/linear.hpp"
 #include "core/rng.hpp"
-#include "ops/matmul.hpp"
 #include "ops/matadd.hpp"
+#include "ops/matmul.hpp"
 
 #include <random>
 

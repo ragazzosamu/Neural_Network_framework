@@ -1,3 +1,4 @@
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
@@ -11,6 +12,7 @@
 #include <vector>
 
 #include "core/tensor.hpp"
+#include "nn/conv2D.hpp"
 #include "nn/linear.hpp"
 #include "nn/module.hpp"
 #include "nn/relu.hpp"
@@ -196,6 +198,57 @@ TEST_CASE("Linear::forward: shapes are correct and errors are wrapped as std::ru
                 SUCCEED();
             }
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Conv2D
+// ---------------------------------------------------------------------------
+TEST_CASE("Conv2D: forward computes output shape and values", "[nn][conv2d]") {
+    Conv2D convolution(1, 1, 2, 2);
+    auto parameters = convolution.parameters();
+
+    // Use deterministic parameters: a 2x2 all-ones filter and zero bias.
+    for (size_t i = 0; i < parameters[0]->size(); ++i) {
+        parameters[0]->set_data(i, 1.0f);
+    }
+    parameters[1]->set_data(0, 0.0f);
+
+    auto input = std::make_shared<Tensor>(std::vector<size_t>{2, 1, 3, 3});
+    for (size_t i = 0; i < input->size(); ++i) {
+        input->set_data(i, 1.0f);
+    }
+
+    auto output = convolution.forward(input);
+
+    REQUIRE(output->shape() == std::vector<size_t>{2, 1, 2, 2});
+    for (size_t i = 0; i < output->size(); ++i) {
+        REQUIRE(output->data()[i] == Catch::Approx(4.0f));
+    }
+}
+
+TEST_CASE("Conv2D: registers weights and biases as parameters", "[nn][conv2d][parameters]") {
+    Conv2D convolution(2, 3, 3, 5);
+    auto parameters = convolution.parameters();
+
+    REQUIRE(parameters.size() == 2);
+    REQUIRE(parameters[0]->shape() == std::vector<size_t>{3, 2, 3, 5});
+    REQUIRE(parameters[1]->shape() == std::vector<size_t>{3, 1});
+}
+
+TEST_CASE("Conv2D: wraps invalid input errors", "[nn][conv2d][exceptions]") {
+    Conv2D convolution(1, 2, 3, 3);
+
+    SECTION("null input") { REQUIRE_THROWS_AS(convolution.forward(nullptr), std::runtime_error); }
+
+    SECTION("wrong channel count") {
+        auto input = std::make_shared<Tensor>(std::vector<size_t>{1, 2, 5, 5});
+        REQUIRE_THROWS_AS(convolution.forward(input), std::runtime_error);
+    }
+
+    SECTION("kernel larger than input") {
+        auto input = std::make_shared<Tensor>(std::vector<size_t>{1, 1, 2, 2});
+        REQUIRE_THROWS_AS(convolution.forward(input), std::runtime_error);
     }
 }
 
