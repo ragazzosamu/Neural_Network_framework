@@ -207,11 +207,11 @@ void MatMulOp::backward(std::shared_ptr<Tensor> grad) const {
     size_t grad_column_number = grad->shape()[maxRank - 1];
     size_t grad_row_number = grad->shape()[maxRank - 2];
 
-    size_t stride_column_A = tensorA->strides()[maxRank - 1];
-    size_t stride_row_A = tensorA->strides()[maxRank - 2];
+    size_t stride_column_A = stridesA[maxRank - 1];
+    size_t stride_row_A = stridesA[maxRank - 2];
 
-    size_t stride_column_B = tensorB->strides()[maxRank - 1];
-    size_t stride_row_B = tensorB->strides()[maxRank - 2];
+    size_t stride_column_B = stridesB[maxRank - 1];
+    size_t stride_row_B = stridesB[maxRank - 2];
 
     size_t stride_column_grad = grad->strides()[maxRank - 1];
     size_t stride_row_grad = grad->strides()[maxRank - 2];

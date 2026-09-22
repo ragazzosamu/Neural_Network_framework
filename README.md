@@ -9,8 +9,9 @@ the development process through practical examples.
 - `include/`: public headers.
 - `src/`: framework implementation.
 - `tests/`: automated Catch2 tests for tensors, operations, losses, modules, and optimizers.
-- `examples/`: space for standalone examples.
-- `python_scripts/`: optional Python scripts used to compare or inspect experiments.
+- `examples/cpp/`: standalone C++ examples such as XOR and MNIST experiments.
+- `examples/python/`: Python counterparts used to compare or inspect experiments.
+- `examples/data/mnist/`: local directory for the MNIST binary dataset file (ignored by Git).
 - `docs/`: additional project documentation.
 - `weights/`: generated model weights. This directory is ignored by Git.
 - `gradients/`: generated gradient files. This directory is ignored by Git.
@@ -24,6 +25,31 @@ the development process through practical examples.
 
 The CMake configuration downloads Catch2 and Google Benchmark through CMake's
 `FetchContent`, so the first configuration requires an internet connection.
+
+## Examples
+
+The executable examples live under `examples/cpp/` and the comparison scripts
+under `examples/python/`:
+
+```bash
+./build/xor
+./build/mnist
+```
+
+On Windows:
+
+```powershell
+.\build\Release\xor.exe
+.\build\Release\mnist.exe
+```
+
+The MNIST example expects the binary dataset to be placed under
+`examples/data/mnist/`. The files are intentionally ignored by Git to keep the
+repository lightweight. The dataset was sourced from
+https://www.kaggle.com/datasets/hojjatk/mnist-dataset.
+
+The folder itself remains tracked via the `.gitkeep` placeholder, so the path is
+present in the repo without committing the downloaded binary files.
 
 ## Build
 
@@ -122,7 +148,7 @@ with a longer experiment after the first measurement.
 
 ## Optional Python Comparison
 
-The script in `python_scripts/test_xor.py` loads the generated weights into a
+The script in `examples/python/xor.py` loads the generated weights into a
 small PyTorch model and writes the Python gradients to
 `gradients/gradients_python.json`.
 
@@ -135,7 +161,7 @@ python -m pip install torch pandas
 Then run:
 
 ```bash
-python python_scripts/test_xor.py
+python examples/python/xor.py
 ```
 
 Run `XORTest` first so that `weights/xor_weights.csv` exists.

@@ -67,3 +67,9 @@ lib/
 
 gradients/
 weights/
+examples/data/mnist/*.bin
+examples/data/mnist/*.idx
+examples/data/mnist/*.gz
+examples/data/mnist/*.dat
+examples/data/mnist/*.raw
+!examples/data/.gitkeep

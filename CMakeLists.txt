@@ -37,6 +37,7 @@ add_library(operations_lib
             src/ops/mse.cpp
             src/ops/im2col.cpp
             src/ops/col2im.cpp
+            src/ops/flatten_convolution_output.cpp
             src/ops/weight2col.cpp)
 target_include_directories(operations_lib PUBLIC include)
 target_link_libraries(operations_lib PUBLIC tensor_lib)
@@ -85,9 +86,13 @@ add_executable(OptimizerTest tests/test_optimizer.cpp)
 target_link_libraries(OptimizerTest PRIVATE optimizer_lib nn_lib operations_lib tensor_lib)
 target_link_libraries(OptimizerTest PRIVATE Catch2::Catch2WithMain)
 
-add_executable(XORTest tests/test_xor.cpp)
-target_link_libraries(XORTest PRIVATE optimizer_lib nn_lib operations_lib tensor_lib loss_lib)
-target_link_libraries(XORTest PRIVATE Catch2::Catch2WithMain)
-target_compile_definitions(XORTest PRIVATE NEURAL_NETWORK_PROJECT_ROOT="${CMAKE_SOURCE_DIR}")
+add_executable(xor examples/cpp/xor.cpp)
+target_link_libraries(xor PRIVATE optimizer_lib nn_lib operations_lib tensor_lib loss_lib)
+target_link_libraries(xor PRIVATE Catch2::Catch2WithMain)
+target_compile_definitions(xor PRIVATE NEURAL_NETWORK_PROJECT_ROOT="${CMAKE_SOURCE_DIR}")
+
+add_executable(mnist examples/cpp/mnist/mnist.cpp)
+target_link_libraries(mnist PRIVATE optimizer_lib nn_lib loss_lib operations_lib tensor_lib)
+target_compile_definitions(mnist PRIVATE NEURAL_NETWORK_PROJECT_ROOT="${CMAKE_SOURCE_DIR}")
 
 

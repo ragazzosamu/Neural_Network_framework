@@ -154,8 +154,16 @@ class Module {
             auto &W = params[0];
             auto shape = W->shape();
 
-            // in the weight matrix the number of inputs is the column_size because we compute x * W
-            size_t fan_in = shape[shape.size() - 2];
+            size_t fan_in = 1;
+            if (shape.size() == 2) {
+                // Linear weights are stored as [input_features, output_features].
+                fan_in = shape[0];
+            } else if (shape.size() >= 3) {
+                // Convolutional weights are stored as [C_out, C_in, K_H, K_W].
+                for (size_t dimension = 1; dimension < shape.size(); ++dimension) {
+                    fan_in *= shape[dimension];
+                }
+            }
             float std_dev = std::sqrt(2.0f / static_cast<float>(fan_in));
 
             std::normal_distribution<float> dis(0.0f, std_dev);
