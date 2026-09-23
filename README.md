@@ -67,6 +67,17 @@ cmake -S . -B build
 cmake --build build --config Release
 ```
 
+To build with OpenBLAS using an existing local installation:
+
+```powershell
+cmake -B build -DNN_USE_OPENBLAS=ON -DNN_FETCH_OPENBLAS=OFF -DOPENBLAS_ROOT="C:/libs/openblas"
+cmake --build build
+```
+
+The OpenBLAS installation must contain `include/cblas.h` and the corresponding
+library under `lib/`. The library architecture must match the selected Visual
+Studio architecture: use an x64 OpenBLAS library for an x64 build.
+
 ## Run the Tests
 
 The test programs are built as separate executables. On Linux or macOS:
@@ -145,6 +156,120 @@ BUILD_DIR=build-linux bash scripts/profile.sh callgrind --build
 backpropagation, and optimizer code. Its workload is small, so for more stable
 hotspot percentages repeat the profiling command or replace the executable
 with a longer experiment after the first measurement.
+
+## MNIST Benchmark: Naive vs OpenBLAS
+
+`benchmarc_mnist` compares the framework's linear and convolutional MNIST
+models. Select a model with `BENCH_MODEL=linear`, `BENCH_MODEL=conv`, or
+`BENCH_MODEL=all` (the default). The benchmark prints the model's training and
+test metrics and elapsed model time. Batch loading happens before the timer
+starts, so these elapsed times measure model execution rather than dataset
+loading.
+
+For a fair comparison, build both variants with the same compiler, build type,
+model, and batch settings. On Linux or WSL, configure separate Release builds:
+
+```bash
+cmake -S . -B build-wsl-naive \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DNN_USE_OPENBLAS=OFF
+cmake --build build-wsl-naive -j"$(nproc)"
+
+cmake -S . -B build-wsl-openblas \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DNN_USE_OPENBLAS=ON
+cmake --build build-wsl-openblas -j"$(nproc)"
+```
+
+OpenBLAS is fetched by CMake by default when `NN_USE_OPENBLAS=ON`. The first
+configuration therefore needs network access. Run each version several times
+and compare the median elapsed time; the first run may include one-time system
+effects. For example, to time the convolutional model five times per build:
+
+```bash
+for build in build-wsl-naive build-wsl-openblas; do
+  echo "=== $build ==="
+  for run in 1 2 3 4 5; do
+    echo "Run $run"
+    BENCH_MODEL=conv OPENBLAS_NUM_THREADS=1 \
+      "./$build/benchmarc_mnist"
+  done
+done
+```
+
+Use `BENCH_MODEL=linear` to compare the linear model, or `BENCH_MODEL=all` to
+run both. By default, the benchmark uses all batches. To shorten a run, set
+`BENCH_MAX_BATCHES`, but use the same value for both builds and record it with
+the results. OpenBLAS thread count should also be held constant; use
+`OPENBLAS_NUM_THREADS=1` for a single-thread comparison.
+
+### Callgrind instruction percentages (OpenBLAS only)
+
+Run the normal Release timing comparison above first. Those wall-clock times
+are the naive-versus-OpenBLAS comparison. Callgrind is a separate profiling
+run: it instruments execution and makes it much slower, so do not use its
+elapsed time in the comparison. In this workflow, collect Callgrind
+percentages only for OpenBLAS.
+
+Build the OpenBLAS variant with debug information, then install Valgrind if
+needed:
+
+```bash
+cmake -S . -B build-wsl-openblas-profile \
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+  -DNN_USE_OPENBLAS=ON
+cmake --build build-wsl-openblas-profile -j"$(nproc)"
+
+sudo apt update
+sudo apt install valgrind
+```
+
+Profile the same model used for the timing comparison (this example uses the
+convolutional model):
+
+```bash
+BENCH_MODEL=conv \
+BUILD_DIR=build-wsl-openblas-profile \
+CALLGRIND_OUT_DIR=callgrind-results-openblas \
+bash scripts/profile_mnist_callgrind.sh
+```
+
+The script sets `BENCH_MAX_BATCHES=2` and uses one OpenBLAS thread by default
+to keep profiling manageable; the batch limit applies only if the benchmark
+reads that environment variable. It saves `report-self.txt` and
+`report-inclusive.txt` under `callgrind-results-openblas/`. Self percentages
+count work attributed directly to a function. Inclusive percentages include
+that function and its callees, so nested inclusive percentages must not be
+added together. Record the model and profiling batch limit with the top
+percentages, separately from the naive and OpenBLAS Release timing results.
+These percentages describe the instruction profile, not elapsed-time shares.
+
+### Working from a Windows checkout in WSL
+
+For longer builds and runs, a copy in WSL's Linux filesystem (for example
+`~/Neural_Network_framework`) is usually preferable to building under
+`/mnt/c`. From the WSL shell, copy the repository while excluding generated
+build and profiling output:
+
+```bash
+sudo apt update
+sudo apt install rsync cmake g++ make git
+mkdir -p "$HOME/Neural_Network_framework"
+rsync -a \
+  --exclude='/build*/' \
+  --exclude='/callgrind-results*/' \
+  "/mnt/c/Users/Samuele Ragazzo/Desktop/Neural_Network_framework/" \
+  "$HOME/Neural_Network_framework/"
+cd "$HOME/Neural_Network_framework"
+git status --short --branch
+```
+
+This copies the current working tree, including its `.git` directory and
+uncommitted tracked changes, while leaving the Windows original in place.
+Ignored files such as the local MNIST dataset are copied too unless excluded.
+Build in this Linux-side copy using the commands above. Since the two copies
+are independent, commits made in one are not automatically present in the
+other; push/pull or copy changes deliberately when you want to synchronize.
 
 ## Optional Python Comparison
 

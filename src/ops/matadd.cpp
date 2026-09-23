@@ -3,6 +3,13 @@
 #include <stdexcept>
 #include <vector>
 
+#ifdef NN_USE_OPENBLAS
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <cblas.h>
+#endif
+
 // Computes C = A + B element-wise, with NumPy-style broadcasting on every
 // dimension (unlike MatMulOp, there's no "special" last-two-dimensions
 // treatment here: every axis is broadcast the same way).
@@ -21,6 +28,22 @@ std::shared_ptr<Tensor> MatAddOp::forward() {
 
     std::vector<size_t> shapeA = tensorA->shape();
     std::vector<size_t> shapeB = tensorB->shape();
+#ifdef NN_USE_OPENBLAS
+    if (shapeA == shapeB && is_contiguous_2d(tensorA) && is_contiguous_2d(tensorB)) {
+        Tensor output(shapeA);
+        const int outputSize = static_cast<int>(output.size());
+
+        cblas_scopy(outputSize, tensorA->data().get(), 1, output.data().get(), 1);
+        cblas_saxpy(outputSize, 1.0f, tensorB->data().get(), 1, output.data().get(), 1);
+
+        if (tensorA->requires_grad() || tensorB->requires_grad()) {
+            output.set_requires_grad(true);
+            output.set_operation(shared_from_this());
+        }
+
+        return std::make_shared<Tensor>(std::move(output));
+    }
+#endif
 
     size_t maxRank = std::max(shapeA.size(), shapeB.size());
 

@@ -162,10 +162,8 @@ int main() {
                   << ", " << train_tensor->shape()[3] << "]\n";
         std::cout << "test_tensor shape: [" << test_tensor->shape()[0] << ", " << test_tensor->shape()[1] << ", " << test_tensor->shape()[2] << ", "
                   << test_tensor->shape()[3] << "]\n";
-        std::cout << "train_flattened shape: [" << train_flattened->shape()[0] << ", " << train_flattened->shape()[1] << ", "
-                  << train_flattened->shape()[2] << "]\n";
-        std::cout << "test_flattened shape: [" << test_flattened->shape()[0] << ", " << test_flattened->shape()[1] << ", "
-                  << test_flattened->shape()[2] << "]\n";
+        std::cout << "train_flattened shape: [" << train_flattened->shape()[0] << ", " << train_flattened->shape()[1] << "]\n";
+        std::cout << "test_flattened shape: [" << test_flattened->shape()[0] << ", " << test_flattened->shape()[1] << "]\n";
         std::cout << "train_labels shape: [" << train_labels->shape()[0] << ", " << train_labels->shape()[1] << "]\n";
         std::cout << "test_labels shape: [" << test_labels->shape()[0] << ", " << test_labels->shape()[1] << "]\n";
         std::cout << "First sample normalized pixel: " << std::fixed << std::setprecision(4) << train_tensor->data()[0] << "\n";

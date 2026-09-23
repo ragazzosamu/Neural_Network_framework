@@ -3,6 +3,13 @@
 #include <stdexcept>
 #include <vector>
 
+#ifdef NN_USE_OPENBLAS
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <cblas.h>
+#endif
+
 // Computes C = A @ B with NumPy-style broadcasting on all dimensions
 // except the last two (which are treated as the actual matrix rows/columns).
 std::shared_ptr<Tensor> MatMulOp::forward() {
@@ -19,6 +26,59 @@ std::shared_ptr<Tensor> MatMulOp::forward() {
 
     std::vector<size_t> shapeA = tensorA->shape();
     std::vector<size_t> shapeB = tensorB->shape();
+
+    // Diagnostic shape logging disabled.
+
+#ifdef NN_USE_OPENBLAS
+    const bool openblas_2d_compatible =
+        shapeA.size() == 2 && shapeB.size() == 2 && shapeA[1] == shapeB[0] && is_contiguous_2d(tensorA) && is_contiguous_2d(tensorB);
+    const bool openblas_batched_compatible = shapeA.size() == 2 && shapeB.size() == 3 && shapeA[1] == shapeB[1] && is_contiguous_2d(tensorA) &&
+                                             tensorB->strides()[2] == 1 && tensorB->strides()[1] == shapeB[2] &&
+                                             tensorB->strides()[0] == shapeB[1] * shapeB[2];
+    const bool openblas_compatible = openblas_2d_compatible || openblas_batched_compatible;
+
+    if (openblas_batched_compatible) {
+        // Diagnostic logging disabled.
+        const size_t batch_size = shapeB[0];
+        const size_t rows = shapeA[0];
+        const size_t inner = shapeA[1];
+        const size_t columns = shapeB[2];
+        Tensor output(std::vector<size_t>{batch_size, rows, columns});
+
+        for (size_t batch = 0; batch < batch_size; ++batch) {
+            const float *batch_input = tensorB->data().get() + batch * inner * columns;
+            float *batch_output = output.data().get() + batch * rows * columns;
+            cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, rows, columns, inner, 1.0f, tensorA->data().get(), inner, batch_input, columns,
+                        0.0f, batch_output, columns);
+        }
+
+        if (tensorA->requires_grad() || tensorB->requires_grad()) {
+            output.set_requires_grad(true);
+            output.set_operation(shared_from_this());
+        }
+
+        return std::make_shared<Tensor>(std::move(output));
+    }
+
+    if (openblas_2d_compatible) {
+        // Diagnostic logging disabled.
+        Tensor output(std::vector<size_t>{shapeA[0], shapeB[1]});
+
+        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, shapeA[0], shapeB[1], shapeA[1], 1.0f, tensorA->data().get(), shapeA[1],
+                    tensorB->data().get(), shapeB[1], 0.0f, output.data().get(), shapeB[1]);
+
+        if (tensorA->requires_grad() || tensorB->requires_grad()) {
+            output.set_requires_grad(true);
+            output.set_operation(shared_from_this());
+        }
+
+        return std::make_shared<Tensor>(std::move(output));
+    }
+#else
+    // Diagnostic logging disabled.
+#endif
+
+    // Diagnostic logging disabled.
 
     size_t maxRank = std::max(shapeA.size(), shapeB.size());
 
@@ -184,6 +244,57 @@ void MatMulOp::backward(std::shared_ptr<Tensor> grad) const {
     if (tensorB->get_grad() == nullptr) {
         tensorB->set_grad(std::make_shared<Tensor>(shapeB));
     }
+
+#ifdef NN_USE_OPENBLAS
+    const auto &shapeGrad = grad->shape();
+    const bool openblas_batched_backward = shapeA.size() == 2 && shapeB.size() == 3 && shapeGrad.size() == 3 && shapeA[1] == shapeB[1] &&
+                                           shapeGrad[0] == shapeB[0] && shapeGrad[1] == shapeA[0] && shapeGrad[2] == shapeB[2] &&
+                                           is_contiguous_2d(tensorA) && tensorB->strides()[2] == 1 && tensorB->strides()[1] == shapeB[2] &&
+                                           tensorB->strides()[0] == shapeB[1] * shapeB[2] && grad->strides()[2] == 1 &&
+                                           grad->strides()[1] == shapeGrad[2] && grad->strides()[0] == shapeGrad[1] * shapeGrad[2];
+
+    if (openblas_batched_backward) {
+        const int batchSize = static_cast<int>(shapeB[0]);
+        const int rowsA = static_cast<int>(shapeA[0]);
+        const int inner = static_cast<int>(shapeA[1]);
+        const int columnsB = static_cast<int>(shapeB[2]);
+
+        // Diagnostic logging disabled.
+
+        for (int batch = 0; batch < batchSize; ++batch) {
+            const float *batchB = tensorB->data().get() + static_cast<size_t>(batch) * inner * columnsB;
+            const float *batchGrad = grad->data().get() + static_cast<size_t>(batch) * rowsA * columnsB;
+            float *batchBGrad = tensorB->get_grad()->data().get() + static_cast<size_t>(batch) * inner * columnsB;
+
+            // dA += dC @ B^T. dA is shared by the whole batch, so accumulate it.
+            cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, rowsA, inner, columnsB, 1.0f, batchGrad, columnsB, batchB, columnsB, 1.0f,
+                        tensorA->get_grad()->data().get(), inner);
+
+            // dB[batch] += A^T @ dC[batch].
+            cblas_sgemm(CblasRowMajor, CblasTrans, CblasNoTrans, inner, columnsB, rowsA, 1.0f, tensorA->data().get(), inner, batchGrad, columnsB,
+                        1.0f, batchBGrad, columnsB);
+        }
+
+        return;
+    }
+
+    if (is_contiguous_2d(tensorA) && is_contiguous_2d(tensorB) && is_contiguous_2d(grad) && shapeA[1] == shapeB[0] && grad->shape()[0] == shapeA[0] &&
+        grad->shape()[1] == shapeB[1]) {
+        const int rowsA = static_cast<int>(shapeA[0]);
+        const int inner = static_cast<int>(shapeA[1]);
+        const int columnsB = static_cast<int>(shapeB[1]);
+
+        // dA += dC @ B^T
+        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, rowsA, inner, columnsB, 1.0f, grad->data().get(), columnsB, tensorB->data().get(),
+                    columnsB, 1.0f, tensorA->get_grad()->data().get(), inner);
+
+        // dB += A^T @ dC
+        cblas_sgemm(CblasRowMajor, CblasTrans, CblasNoTrans, inner, columnsB, rowsA, 1.0f, tensorA->data().get(), inner, grad->data().get(), columnsB,
+                    1.0f, tensorB->get_grad()->data().get(), columnsB);
+
+        return;
+    }
+#endif
 
     size_t maxRank = std::max(shapeA.size(), shapeB.size());
 

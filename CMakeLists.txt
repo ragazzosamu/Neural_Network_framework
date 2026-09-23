@@ -4,6 +4,12 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include(FetchContent)
 
+# Keep every FetchContent dependency inside the selected build directory.
+# This makes `build` self-contained and avoids creating/using sibling build
+# directories for downloaded sources and generated dependency files.
+set(FETCHCONTENT_BASE_DIR "${CMAKE_BINARY_DIR}/_deps" CACHE PATH
+    "Directory used for all FetchContent dependencies")
+
 
 FetchContent_Declare(
   googlebenchmark
@@ -41,6 +47,68 @@ add_library(operations_lib
             src/ops/weight2col.cpp)
 target_include_directories(operations_lib PUBLIC include)
 target_link_libraries(operations_lib PUBLIC tensor_lib)
+
+option(NN_USE_OPENBLAS "Use OpenBLAS for 2D operations" OFF)
+option(NN_FETCH_OPENBLAS "Download OpenBLAS with FetchContent" ON)
+
+if(NN_USE_OPENBLAS)
+    if(NN_FETCH_OPENBLAS)
+        set(BUILD_TESTING OFF CACHE BOOL "Disable OpenBLAS tests" FORCE)
+        set(BUILD_BENCHMARKS OFF CACHE BOOL "Disable OpenBLAS benchmarks" FORCE)
+        set(BUILD_WITHOUT_LAPACK ON CACHE BOOL "Build only BLAS and CBLAS" FORCE)
+        set(ONLY_CBLAS ON CACHE BOOL "Build only the CBLAS interface" FORCE)
+
+        FetchContent_Declare(
+            openblas
+            GIT_REPOSITORY https://github.com/OpenMathLib/OpenBLAS.git
+            GIT_TAG v0.3.29
+            GIT_SHALLOW TRUE
+        )
+        FetchContent_MakeAvailable(openblas)
+
+        if(TARGET openblas)
+            set(OPENBLAS_TARGET openblas)
+        elseif(TARGET OpenBLAS::OpenBLAS)
+            set(OPENBLAS_TARGET OpenBLAS::OpenBLAS)
+        else()
+            message(FATAL_ERROR "FetchContent downloaded OpenBLAS, but no CMake target was created.")
+        endif()
+
+        target_include_directories(operations_lib PRIVATE
+            ${openblas_SOURCE_DIR}
+            ${openblas_SOURCE_DIR}/include
+            ${openblas_SOURCE_DIR}/lapack-netlib/CBLAS/include
+            ${openblas_BINARY_DIR}
+            ${openblas_BINARY_DIR}/include
+            ${openblas_BINARY_DIR}/include/openblas
+        )
+        target_link_libraries(operations_lib PRIVATE ${OPENBLAS_TARGET})
+    else()
+        set(OPENBLAS_ROOT "" CACHE PATH "OpenBLAS installation directory")
+
+        find_path(OPENBLAS_INCLUDE_DIR
+            NAMES cblas.h
+            HINTS ${OPENBLAS_ROOT}
+            PATH_SUFFIXES include
+        )
+        find_library(OPENBLAS_LIBRARY
+            NAMES openblas libopenblas
+            HINTS ${OPENBLAS_ROOT}
+            PATH_SUFFIXES lib
+        )
+
+        if(NOT OPENBLAS_INCLUDE_DIR OR NOT OPENBLAS_LIBRARY)
+            message(FATAL_ERROR
+                "OpenBLAS was not found. Set OPENBLAS_ROOT or enable NN_FETCH_OPENBLAS."
+            )
+        endif()
+
+        target_include_directories(operations_lib PRIVATE ${OPENBLAS_INCLUDE_DIR})
+        target_link_libraries(operations_lib PRIVATE ${OPENBLAS_LIBRARY})
+    endif()
+
+    target_compile_definitions(operations_lib PRIVATE NN_USE_OPENBLAS)
+endif()
 
 add_library(loss_lib
             src/loss.cpp)
@@ -94,5 +162,10 @@ target_compile_definitions(xor PRIVATE NEURAL_NETWORK_PROJECT_ROOT="${CMAKE_SOUR
 add_executable(mnist examples/cpp/mnist/mnist.cpp)
 target_link_libraries(mnist PRIVATE optimizer_lib nn_lib loss_lib operations_lib tensor_lib)
 target_compile_definitions(mnist PRIVATE NEURAL_NETWORK_PROJECT_ROOT="${CMAKE_SOURCE_DIR}")
+
+add_executable(benchmarc_mnist examples/cpp/mnist/benchmarc_mnist.cpp)
+target_link_libraries(benchmarc_mnist PRIVATE optimizer_lib nn_lib loss_lib operations_lib tensor_lib Catch2::Catch2WithMain)
+target_compile_definitions(benchmarc_mnist PRIVATE NEURAL_NETWORK_PROJECT_ROOT="${CMAKE_SOURCE_DIR}")
+
 
 
