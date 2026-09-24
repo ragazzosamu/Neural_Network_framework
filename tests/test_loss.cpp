@@ -1,8 +1,9 @@
 // Catch2 v3 test suite for the Loss class.
 //
 // Based on the usage seen in softmax.cpp, Tensor's constructor only takes
-// a shape (`Tensor output(shape);`), and individual elements are set with
-// `set_data(index, value)`. `make_tensor()` below builds tensors that way.
+// a shape (`Tensor output(shape);`), and individual elements are set through
+// the raw buffer (`data()[index] = value`). `make_tensor()` below builds
+// tensors that way.
 // If your real API differs, that's the only place you should need to change.
 
 #include <catch2/catch_approx.hpp>
@@ -20,7 +21,7 @@ namespace {
 std::shared_ptr<Tensor> make_tensor(std::vector<size_t> shape, const std::vector<float> &data) {
     auto tensor = std::make_shared<Tensor>(shape);
     for (size_t i = 0; i < data.size(); ++i) {
-        tensor->set_data(i, data[i]);
+        tensor->data()[i] = data[i];
     }
     return tensor;
 }

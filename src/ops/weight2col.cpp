@@ -18,7 +18,9 @@ std::shared_ptr<Tensor> Weight2ColOp::forward() {
 
     const size_t values_per_filter = weight_shape[1] * weight_shape[2] * weight_shape[3];
     Tensor output({weight_shape[0], values_per_filter});
-    const auto weight_data = weight->data();
+    const float *weight_data = weight->data();
+    float *output_data = output.data();
+    const size_t size = weight->size();
 
     // Weight2Col is simpler than Im2Col: no image positions are visited.
     // There is no output_y/output_x, padding, stride or dilation here because
@@ -27,8 +29,8 @@ std::shared_ptr<Tensor> Weight2ColOp::forward() {
     // Each output row is one complete filter. Flattening preserves the order
     // used by Im2ColOp for its rows: channel, kernel_y, then kernel_x.
     // This matching order is required for [C_out, K] @ [K, N].
-    for (size_t i = 0; i < weight->size(); ++i) {
-        output.set_data(i, weight_data[i]);
+    for (size_t i = 0; i < size; ++i) {
+        output_data[i] = weight_data[i];
     }
 
     if (weight->requires_grad()) {
@@ -65,13 +67,14 @@ void Weight2ColOp::backward(std::shared_ptr<Tensor> grad) const {
         weight->set_grad(std::make_shared<Tensor>(weight_shape));
     }
 
-    const auto weight_grad = weight->get_grad();
-    const auto grad_data = grad->data();
+    float *weight_grad = weight->get_grad()->data();
+    const float *grad_data = grad->data();
+    const size_t size = weight->size();
 
     // Weight2Col does not move values: it only changes the logical shape.
     // Therefore the inverse operation keeps the same linear index and adds
     // the gradient back to the original [C_out, C_in, K_H, K_W] tensor.
-    for (size_t index = 0; index < weight->size(); ++index) {
-        weight_grad->add_to_data(index, grad_data[index]);
+    for (size_t index = 0; index < size; ++index) {
+        weight_grad[index] += grad_data[index];
     }
 }

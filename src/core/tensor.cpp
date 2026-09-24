@@ -32,9 +32,11 @@ void Tensor::reshape(vector<size_t> new_shape) {
 
 Tensor Tensor::transpose() const {
     Tensor transposed = *this;
-    // A new autograd node: the old gradient no longer applies to this
-    // (differently-shaped) view.
+    // The view is detached from the autograd graph: the old gradient and the
+    // producing operation both refer to the original shape, so keeping them
+    // would make backward() feed a transposed-shape gradient into that op.
     transposed.grad = nullptr;
+    transposed.t_operation = nullptr;
     std::reverse(transposed.t_shape.begin(), transposed.t_shape.end());
     std::reverse(transposed.t_strides.begin(), transposed.t_strides.end());
     return transposed;
@@ -62,9 +64,9 @@ Tensor Tensor::permute(const vector<size_t> &new_axis) const {
         seen[axis] = true;
     }
     Tensor permutated = *this;
-    // A new autograd node: the old gradient no longer applies to this
-    // (differently-shaped) view.
+    // The view is detached from the autograd graph (see transpose()).
     permutated.grad = nullptr;
+    permutated.t_operation = nullptr;
     for (size_t i = 0; i < t_shape.size(); ++i) {
         permutated.t_shape[i] = t_shape[new_axis[i]];
         permutated.t_strides[i] = t_strides[new_axis[i]];
@@ -74,7 +76,28 @@ Tensor Tensor::permute(const vector<size_t> &new_axis) const {
 
 Tensor Tensor::clone() const {
     auto new_data = std::shared_ptr<float[]>(new float[totalSize]);
-    std::copy(t_data.get(), t_data.get() + totalSize, new_data.get());
+
+    // The clone is always contiguous. When this tensor is a non-contiguous
+    // view (transpose()/permute()), the buffer can't be copied as-is: each
+    // element is read through the view's strides, in logical (row-major) order.
+    vector<size_t> contiguous_strides = t_strides;
+    for (size_t i = t_shape.size(); i-- > 0;) {
+        contiguous_strides[i] = (i + 1 < t_shape.size()) ? contiguous_strides[i + 1] * t_shape[i + 1] : 1;
+    }
+
+    if (t_strides == contiguous_strides) {
+        std::copy(t_data.get(), t_data.get() + totalSize, new_data.get());
+    } else {
+        for (size_t i = 0; i < totalSize; ++i) {
+            size_t remaining = i;
+            size_t offset = 0;
+            for (size_t d = t_shape.size(); d-- > 0;) {
+                offset += (remaining % t_shape[d]) * t_strides[d];
+                remaining /= t_shape[d];
+            }
+            new_data[i] = t_data[offset];
+        }
+    }
 
     Tensor cloned(t_shape, new_data);
     cloned.set_requires_grad(t_require_grad);
@@ -113,10 +136,6 @@ void Tensor::set_requires_grad(bool req) { t_require_grad = req; }
 const vector<size_t> &Tensor::shape() const { return t_shape; }
 const vector<size_t> &Tensor::strides() const { return t_strides; }
 size_t Tensor::size() const { return totalSize; }
-
-std::shared_ptr<float[]> Tensor::data() const { return t_data; }
-void Tensor::set_data(size_t i, float value) { t_data[i] = value; }
-void Tensor::add_to_data(size_t i, float value) { t_data[i] += value; }
 
 const std::shared_ptr<Tensor> &Tensor::get_grad() const { return grad; }
 void Tensor::set_grad(std::shared_ptr<Tensor> new_grad) { grad = std::move(new_grad); }

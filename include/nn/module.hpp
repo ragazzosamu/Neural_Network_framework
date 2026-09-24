@@ -169,9 +169,9 @@ class Module {
             std::normal_distribution<float> dis(0.0f, std_dev);
             auto &gen = rng::engine();
 
+            float *W_data = W->data();
             for (size_t i = 0; i < W->size(); ++i) {
-
-                W->set_data(i, dis(gen));
+                W_data[i] = dis(gen);
             }
         }
     }

@@ -30,9 +30,12 @@ std::shared_ptr<Tensor> MatMulOp::forward() {
     // Diagnostic shape logging disabled.
 
 #ifdef NN_USE_OPENBLAS
-    const bool openblas_2d_compatible =
-        shapeA.size() == 2 && shapeB.size() == 2 && shapeA[1] == shapeB[0] && is_contiguous_2d(tensorA) && is_contiguous_2d(tensorB);
-    const bool openblas_batched_compatible = shapeA.size() == 2 && shapeB.size() == 3 && shapeA[1] == shapeB[1] && is_contiguous_2d(tensorA) &&
+    // Zero-sized matrices are left to the generic path below, which rejects
+    // them with std::invalid_argument (cblas_sgemm would silently accept them).
+    const bool openblas_2d_compatible = shapeA.size() == 2 && shapeB.size() == 2 && shapeA[1] == shapeB[0] && shapeA[0] != 0 && shapeB[1] != 0 &&
+                                        is_contiguous_2d(tensorA) && is_contiguous_2d(tensorB);
+    const bool openblas_batched_compatible = shapeA.size() == 2 && shapeB.size() == 3 && shapeA[1] == shapeB[1] && shapeA[0] != 0 &&
+                                             shapeB[2] != 0 && is_contiguous_2d(tensorA) &&
                                              tensorB->strides()[2] == 1 && tensorB->strides()[1] == shapeB[2] &&
                                              tensorB->strides()[0] == shapeB[1] * shapeB[2];
     const bool openblas_compatible = openblas_2d_compatible || openblas_batched_compatible;
@@ -46,9 +49,9 @@ std::shared_ptr<Tensor> MatMulOp::forward() {
         Tensor output(std::vector<size_t>{batch_size, rows, columns});
 
         for (size_t batch = 0; batch < batch_size; ++batch) {
-            const float *batch_input = tensorB->data().get() + batch * inner * columns;
-            float *batch_output = output.data().get() + batch * rows * columns;
-            cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, rows, columns, inner, 1.0f, tensorA->data().get(), inner, batch_input, columns,
+            const float *batch_input = tensorB->data() + batch * inner * columns;
+            float *batch_output = output.data() + batch * rows * columns;
+            cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, rows, columns, inner, 1.0f, tensorA->data(), inner, batch_input, columns,
                         0.0f, batch_output, columns);
         }
 
@@ -64,8 +67,8 @@ std::shared_ptr<Tensor> MatMulOp::forward() {
         // Diagnostic logging disabled.
         Tensor output(std::vector<size_t>{shapeA[0], shapeB[1]});
 
-        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, shapeA[0], shapeB[1], shapeA[1], 1.0f, tensorA->data().get(), shapeA[1],
-                    tensorB->data().get(), shapeB[1], 0.0f, output.data().get(), shapeB[1]);
+        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, shapeA[0], shapeB[1], shapeA[1], 1.0f, tensorA->data(), shapeA[1],
+                    tensorB->data(), shapeB[1], 0.0f, output.data(), shapeB[1]);
 
         if (tensorA->requires_grad() || tensorB->requires_grad()) {
             output.set_requires_grad(true);
@@ -151,8 +154,9 @@ std::shared_ptr<Tensor> MatMulOp::forward() {
 
     // Cache the underlying buffers/shape once, instead of re-invoking these accessors
     // on every single access inside the loops below.
-    const auto &dataA = tensorA->data();
-    const auto &dataB = tensorB->data();
+    const float *dataA = tensorA->data();
+    const float *dataB = tensorB->data();
+    float *dataOutput = output.data();
     const auto &outShape = output.shape();
 
     for (size_t b = 0; b < iteration_number; ++b) {
@@ -179,7 +183,7 @@ std::shared_ptr<Tensor> MatMulOp::forward() {
                 for (size_t j = 0; j < B_column_number; ++j) {
                     float value = valA * dataB[col_offset_B + j * stride_column_B];
                     size_t output_index = row_offset_output + j * stride_column_output;
-                    output.add_to_data(output_index, value);
+                    dataOutput[output_index] += value;
                 }
             }
         }
@@ -213,7 +217,7 @@ for (size_t i = 0; i < output_size; ++i) {
                  (offsetB + j * tensorB->strides()[maxRank - 2]);
     }
 
-    output.set_data(i, value);
+    output.data()[i] = value;
 }
 */
 
@@ -247,7 +251,10 @@ void MatMulOp::backward(std::shared_ptr<Tensor> grad) const {
 
 #ifdef NN_USE_OPENBLAS
     const auto &shapeGrad = grad->shape();
+    // As in forward(), zero-sized matrices fall through to the generic path,
+    // which rejects them.
     const bool openblas_batched_backward = shapeA.size() == 2 && shapeB.size() == 3 && shapeGrad.size() == 3 && shapeA[1] == shapeB[1] &&
+                                           shapeGrad[1] != 0 && shapeGrad[2] != 0 &&
                                            shapeGrad[0] == shapeB[0] && shapeGrad[1] == shapeA[0] && shapeGrad[2] == shapeB[2] &&
                                            is_contiguous_2d(tensorA) && tensorB->strides()[2] == 1 && tensorB->strides()[1] == shapeB[2] &&
                                            tensorB->strides()[0] == shapeB[1] * shapeB[2] && grad->strides()[2] == 1 &&
@@ -262,16 +269,16 @@ void MatMulOp::backward(std::shared_ptr<Tensor> grad) const {
         // Diagnostic logging disabled.
 
         for (int batch = 0; batch < batchSize; ++batch) {
-            const float *batchB = tensorB->data().get() + static_cast<size_t>(batch) * inner * columnsB;
-            const float *batchGrad = grad->data().get() + static_cast<size_t>(batch) * rowsA * columnsB;
-            float *batchBGrad = tensorB->get_grad()->data().get() + static_cast<size_t>(batch) * inner * columnsB;
+            const float *batchB = tensorB->data() + static_cast<size_t>(batch) * inner * columnsB;
+            const float *batchGrad = grad->data() + static_cast<size_t>(batch) * rowsA * columnsB;
+            float *batchBGrad = tensorB->get_grad()->data() + static_cast<size_t>(batch) * inner * columnsB;
 
             // dA += dC @ B^T. dA is shared by the whole batch, so accumulate it.
             cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, rowsA, inner, columnsB, 1.0f, batchGrad, columnsB, batchB, columnsB, 1.0f,
-                        tensorA->get_grad()->data().get(), inner);
+                        tensorA->get_grad()->data(), inner);
 
             // dB[batch] += A^T @ dC[batch].
-            cblas_sgemm(CblasRowMajor, CblasTrans, CblasNoTrans, inner, columnsB, rowsA, 1.0f, tensorA->data().get(), inner, batchGrad, columnsB,
+            cblas_sgemm(CblasRowMajor, CblasTrans, CblasNoTrans, inner, columnsB, rowsA, 1.0f, tensorA->data(), inner, batchGrad, columnsB,
                         1.0f, batchBGrad, columnsB);
         }
 
@@ -279,18 +286,18 @@ void MatMulOp::backward(std::shared_ptr<Tensor> grad) const {
     }
 
     if (is_contiguous_2d(tensorA) && is_contiguous_2d(tensorB) && is_contiguous_2d(grad) && shapeA[1] == shapeB[0] && grad->shape()[0] == shapeA[0] &&
-        grad->shape()[1] == shapeB[1]) {
+        grad->shape()[1] == shapeB[1] && shapeGrad[0] != 0 && shapeGrad[1] != 0) {
         const int rowsA = static_cast<int>(shapeA[0]);
         const int inner = static_cast<int>(shapeA[1]);
         const int columnsB = static_cast<int>(shapeB[1]);
 
         // dA += dC @ B^T
-        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, rowsA, inner, columnsB, 1.0f, grad->data().get(), columnsB, tensorB->data().get(),
-                    columnsB, 1.0f, tensorA->get_grad()->data().get(), inner);
+        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, rowsA, inner, columnsB, 1.0f, grad->data(), columnsB, tensorB->data(),
+                    columnsB, 1.0f, tensorA->get_grad()->data(), inner);
 
         // dB += A^T @ dC
-        cblas_sgemm(CblasRowMajor, CblasTrans, CblasNoTrans, inner, columnsB, rowsA, 1.0f, tensorA->data().get(), inner, grad->data().get(), columnsB,
-                    1.0f, tensorB->get_grad()->data().get(), columnsB);
+        cblas_sgemm(CblasRowMajor, CblasTrans, CblasNoTrans, inner, columnsB, rowsA, 1.0f, tensorA->data(), inner, grad->data(), columnsB,
+                    1.0f, tensorB->get_grad()->data(), columnsB);
 
         return;
     }
@@ -312,6 +319,12 @@ void MatMulOp::backward(std::shared_ptr<Tensor> grad) const {
     std::vector<size_t> stridesB = broadcast_strides(tensorB->strides(), shapeB, maxRank);
     std::vector<size_t> stridesgrad = broadcast_strides(grad->strides(), grad->shape(), maxRank);
 
+    // A and B are read through their own strides (they may be non-contiguous
+    // views), but dA and dB are separate tensors with their own (normally
+    // contiguous) layout, so they must be written through *their* strides.
+    std::vector<size_t> stridesGradA = broadcast_strides(tensorA->get_grad()->strides(), shapeA, maxRank);
+    std::vector<size_t> stridesGradB = broadcast_strides(tensorB->get_grad()->strides(), shapeB, maxRank);
+
     // Original (non-broadcast) strides: the real step size in memory for each matrix.
     size_t A_column_number = shapeA[maxRank - 1];
     size_t B_row_number = shapeB[maxRank - 2];
@@ -323,6 +336,12 @@ void MatMulOp::backward(std::shared_ptr<Tensor> grad) const {
 
     size_t stride_column_B = stridesB[maxRank - 1];
     size_t stride_row_B = stridesB[maxRank - 2];
+
+    size_t stride_column_gradA = stridesGradA[maxRank - 1];
+    size_t stride_row_gradA = stridesGradA[maxRank - 2];
+
+    size_t stride_column_gradB = stridesGradB[maxRank - 1];
+    size_t stride_row_gradB = stridesGradB[maxRank - 2];
 
     size_t stride_column_grad = grad->strides()[maxRank - 1];
     size_t stride_row_grad = grad->strides()[maxRank - 2];
@@ -338,27 +357,30 @@ void MatMulOp::backward(std::shared_ptr<Tensor> grad) const {
 
     // Cache the underlying buffers/shape/gradient-tensors once, instead of
     // re-invoking these accessors on every single access inside the loops below.
-    const auto &dataA = tensorA->data();
-    const auto &dataB = tensorB->data();
-    const auto &dataGrad = grad->data();
+    const float *dataA = tensorA->data();
+    const float *dataB = tensorB->data();
+    const float *dataGrad = grad->data();
     const auto &gradShape = grad->shape();
-    const auto &gradA = tensorA->get_grad();
-    const auto &gradB = tensorB->get_grad();
+    float *gradA = tensorA->get_grad()->data();
+    float *gradB = tensorB->get_grad()->data();
 
     for (size_t b = 0; b < iteration_number; ++b) {
         size_t offsetA, offsetB, offsetgrad;
         broadcast_offsets(b, gradShape, stridesA, stridesB, stridesgrad, offsetA, offsetB, offsetgrad);
+        size_t offsetGradA, offsetGradB, unused;
+        broadcast_offsets(b, gradShape, stridesGradA, stridesGradB, stridesgrad, offsetGradA, offsetGradB, unused);
 
         for (size_t i = 0; i < grad_row_number; ++i) {
             // Row-only parts of the offsets, hoisted out of the k loop since they
             // don't depend on k.
             size_t row_offset_A = offsetA + i * stride_row_A;
+            size_t row_offset_gradA = offsetGradA + i * stride_row_gradA;
             size_t row_offset_grad = offsetgrad + i * stride_row_grad;
 
             for (size_t j = 0; j < B_row_number; ++j) {
-                size_t A_idx = row_offset_A + j * stride_column_A;
-                float valA = dataA[A_idx];
+                float valA = dataA[row_offset_A + j * stride_column_A];
                 size_t row_offset_B = offsetB + j * stride_row_B;
+                size_t row_offset_gradB = offsetGradB + j * stride_row_gradB;
 
                 float acc = 0.0f;
                 // For this row i of the gradient, loop over each row j of B (equivalently, each
@@ -367,13 +389,12 @@ void MatMulOp::backward(std::shared_ptr<Tensor> grad) const {
                 // the running dot-product sum that becomes dA[i,j].
                 for (size_t k = 0; k < grad_column_number; ++k) {
                     float valgrad = dataGrad[row_offset_grad + k * stride_column_grad];
-                    size_t B_idx = row_offset_B + k * stride_column_B;
 
-                    gradB->add_to_data(B_idx, valA * valgrad);
-                    acc += valgrad * dataB[B_idx];
+                    gradB[row_offset_gradB + k * stride_column_gradB] += valA * valgrad;
+                    acc += valgrad * dataB[row_offset_B + k * stride_column_B];
                 }
 
-                gradA->add_to_data(A_idx, acc);
+                gradA[row_offset_gradA + j * stride_column_gradA] += acc;
             }
         }
     }

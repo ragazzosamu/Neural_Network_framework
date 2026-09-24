@@ -16,7 +16,7 @@ std::shared_ptr<Tensor> MeanOp::forward() {
         throw std::invalid_argument("Input tensors must not be null");
     }
 
-    auto const &input_data = input_tensor->data();
+    const float *input_data = input_tensor->data();
     size_t input_size = input_tensor->size();
 
     // Avoid dividing by zero on an empty tensor.
@@ -30,7 +30,7 @@ std::shared_ptr<Tensor> MeanOp::forward() {
     }
 
     auto output = std::make_shared<Tensor>(std::vector<size_t>{1});
-    output->set_data(0, sum / static_cast<float>(input_size));
+    output->data()[0] = sum / static_cast<float>(input_size);
 
     if (input_tensor->requires_grad()) {
         output->set_requires_grad(true);
@@ -58,11 +58,11 @@ void MeanOp::backward(std::shared_ptr<Tensor> grad) const {
         input_tensor->set_grad(std::make_shared<Tensor>(input_tensor->shape()));
     }
 
-    auto input_grad = input_tensor->get_grad();
-    auto const &grad_data = grad->data();
+    float *input_grad = input_tensor->get_grad()->data();
+    const float *grad_data = grad->data();
     float grad_value = grad_data[0] / static_cast<float>(input_size);
 
     for (size_t i = 0; i < input_size; ++i) {
-        input_grad->add_to_data(i, grad_value);
+        input_grad[i] += grad_value;
     }
 };

@@ -14,16 +14,18 @@ std::shared_ptr<Tensor> ReluOp::forward() {
         throw std::invalid_argument("Input tensor must not be null");
     }
 
-    auto data = input->data();
+    const float *data = input->data();
 
     Tensor output(input->shape());
+    float *output_data = output.data();
+    const size_t size = input->size();
 
     // The Tensor constructor already zero-initializes `output`, so only the
     // positive elements need to be written explicitly; everywhere data[i] <= 0
     // the output is left at its default 0.
-    for (size_t i = 0; i < input->size(); ++i) {
+    for (size_t i = 0; i < size; ++i) {
         if (data[i] > 0.0f) {
-            output.set_data(i, data[i]);
+            output_data[i] = data[i];
         }
     }
 
@@ -55,20 +57,21 @@ void ReluOp::backward(std::shared_ptr<Tensor> grad) const {
         throw std::invalid_argument("Input tensor must not be null");
     }
 
-    auto data = input->data();
+    const float *data = input->data();
 
     if (input->get_grad() == nullptr) {
         input->set_grad(std::make_shared<Tensor>(input->shape()));
     }
 
-    auto input_grad = input->get_grad();
-    auto grad_data = grad->data();
+    float *input_grad = input->get_grad()->data();
+    const float *grad_data = grad->data();
+    const size_t size = input->size();
 
-    for (size_t i = 0; i < input->size(); ++i) {
+    for (size_t i = 0; i < size; ++i) {
         // Route the gradient through only where the input was positive
         // (the "gate" left open by relu's derivative).
         if (data[i] > 0.0f) {
-            input_grad->add_to_data(i, grad_data[i]);
+            input_grad[i] += grad_data[i];
         }
     }
 }

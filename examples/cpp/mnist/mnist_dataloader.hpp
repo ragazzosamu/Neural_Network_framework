@@ -90,10 +90,11 @@ class MnistDatasetLoader {
         const std::size_t pixels_per_image = height * width;
 
         auto tensor = std::make_shared<Tensor>(std::vector<size_t>{sample_count, channels, height, width});
+        float *tensor_data = tensor->data();
         for (std::size_t sample = 0; sample < sample_count; ++sample) {
             const std::size_t sample_offset = sample * pixels_per_image;
             for (std::size_t pixel = 0; pixel < pixels_per_image; ++pixel) {
-                tensor->set_data(sample * channels * height * width + pixel, dataset.images[sample_offset + pixel] / 255.0f);
+                tensor_data[sample * channels * height * width + pixel] = dataset.images[sample_offset + pixel] / 255.0f;
             }
         }
         return tensor;
@@ -133,13 +134,14 @@ class MnistDatasetLoader {
 
     std::shared_ptr<Tensor> one_hot_labels(const RawDataset &dataset, std::size_t num_classes = 10) const {
         auto labels = std::make_shared<Tensor>(std::vector<size_t>{dataset.labels.size(), num_classes});
+        float *labels_data = labels->data();
         for (std::size_t i = 0; i < dataset.labels.size(); ++i) {
             const int label = dataset.labels[i];
             if (label < 0 || static_cast<std::size_t>(label) >= num_classes) {
                 throw std::out_of_range("MNIST label out of range for one-hot encoding");
             }
             for (std::size_t cls = 0; cls < num_classes; ++cls) {
-                labels->set_data(i * num_classes + cls, cls == static_cast<std::size_t>(label) ? 1.0f : 0.0f);
+                labels_data[i * num_classes + cls] = cls == static_cast<std::size_t>(label) ? 1.0f : 0.0f;
             }
         }
         return labels;
@@ -170,13 +172,10 @@ class MnistDatasetLoader {
             const std::size_t end = std::min(start + batch_size, n);
             batch_shape[0] = end - start;
             auto batch = std::make_shared<Tensor>(batch_shape);
-            for (std::size_t sample = start; sample < end; ++sample) {
-                const std::size_t source_offset = sample * sample_size;
-                const std::size_t destination_offset = (sample - start) * sample_size;
-                for (std::size_t element = 0; element < sample_size; ++element) {
-                    batch->set_data(destination_offset + element, tensor->data()[source_offset + element]);
-                }
-            }
+            // Samples [start, end) are contiguous in the source tensor, so the
+            // whole batch is a single block copy.
+            const float *source = tensor->data() + start * sample_size;
+            std::copy(source, source + (end - start) * sample_size, batch->data());
             batches.push_back(batch);
         }
         return batches;

@@ -21,20 +21,19 @@ void Adam::step() {
         auto &m_t = m[index];
         auto &v_t = v[index];
 
-        auto const &m_data = m_t->data();
-        auto const &v_data = v_t->data();
-        auto const &grad_data = grad->data();
-        auto const &param_data = param->data();
+        float *m_data = m_t->data();
+        float *v_data = v_t->data();
+        const float *grad_data = grad->data();
+        float *param_data = param->data();
+        const size_t size = param->size();
 
-        for (size_t i = 0; i < param->size(); ++i) {
-
-            m_t->set_data(i, beta1 * m_data[i] + (1 - beta1) * grad_data[i]);
-            v_t->set_data(i, beta2 * v_data[i] + (1 - beta2) * grad_data[i] * grad_data[i]);
+        for (size_t i = 0; i < size; ++i) {
+            m_data[i] = beta1 * m_data[i] + (1 - beta1) * grad_data[i];
+            v_data[i] = beta2 * v_data[i] + (1 - beta2) * grad_data[i] * grad_data[i];
         }
 
-        for (size_t i = 0; i < param->size(); ++i) {
-            float new_value = param_data[i] - learning_rate * m_t->data()[i] / (std::sqrt(v_t->data()[i]) + epsilon);
-            param->set_data(i, new_value);
+        for (size_t i = 0; i < size; ++i) {
+            param_data[i] -= learning_rate * m_data[i] / (std::sqrt(v_data[i]) + epsilon);
         }
     }
 }

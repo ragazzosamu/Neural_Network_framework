@@ -116,8 +116,8 @@ void training_loop(std::shared_ptr<Tensor> &input, std::shared_ptr<Tensor> &targ
         auto b_target = std::make_shared<Tensor>(std::vector<size_t>{batch_size, features});
         size_t batch_offset = b * elements_per_batch;
         for (size_t i = 0; i < elements_per_batch; ++i) {
-            b_input->set_data(i, input->data()[batch_offset + i]);
-            b_target->set_data(i, target->data()[batch_offset + i]);
+            b_input->data()[i] = input->data()[batch_offset + i];
+            b_target->data()[i] = target->data()[batch_offset + i];
         }
         batch_inputs.push_back(b_input);
         batch_targets.push_back(b_target);
@@ -142,7 +142,7 @@ void training_loop(std::shared_ptr<Tensor> &input, std::shared_ptr<Tensor> &targ
             std::shared_ptr<Tensor> loss = Loss::cross_entropy(prediction, batch_targets[j]);
             train_loss += loss->item();
 
-            const float *raw_ptr = prediction->data().get();
+            const float *raw_ptr = prediction->data();
             for (size_t k = 0; k < batch_size; ++k) {
                 size_t offset_feature = k * 2;
                 const float *max_it = std::max_element(raw_ptr + offset_feature, raw_ptr + offset_feature + 2);
@@ -165,7 +165,7 @@ void training_loop(std::shared_ptr<Tensor> &input, std::shared_ptr<Tensor> &targ
         std::shared_ptr<Tensor> loss = Loss::cross_entropy(prediction, test_target);
         test_loss = loss->item();
 
-        const float *raw_ptr = prediction->data().get();
+        const float *raw_ptr = prediction->data();
         size_t evaluation_samples = test_input->size() / features;
         for (size_t k = 0; k < evaluation_samples; ++k) {
             size_t offset_feature = k * 2;
@@ -211,18 +211,18 @@ int main(int argc, char *argv[]) {
     for (size_t i = 0; i < input->size(); ++i) {
         size_t j = i / 2;
         size_t k = i % 2;
-        input->set_data(i, X[j][k]);
+        input->data()[i] = X[j][k];
     }
 
     std::shared_ptr<Tensor> target = std::make_shared<Tensor>(std::vector<size_t>{3, 7, 2});
     for (size_t i = 0; i < 21; ++i) {
         size_t offset = i * 2;
         if (Y_labels[i] == 0) {
-            target->set_data(offset, 1);
-            target->set_data(offset + 1, 0);
+            target->data()[offset] = 1;
+            target->data()[offset + 1] = 0;
         } else {
-            target->set_data(offset, 0);
-            target->set_data(offset + 1, 1);
+            target->data()[offset] = 0;
+            target->data()[offset + 1] = 1;
         }
     }
 
@@ -231,16 +231,16 @@ int main(int argc, char *argv[]) {
     std::shared_ptr<Tensor> test_target = std::make_shared<Tensor>(std::vector<size_t>{test_size, 2});
     for (size_t i = 0; i < test_size; ++i) {
         size_t src = 21 + i;
-        test_input->set_data(i * 2, X[src][0]);
-        test_input->set_data(i * 2 + 1, X[src][1]);
+        test_input->data()[i * 2] = X[src][0];
+        test_input->data()[i * 2 + 1] = X[src][1];
 
         size_t offset = i * 2;
         if (Y_labels[src] == 0) {
-            test_target->set_data(offset, 1);
-            test_target->set_data(offset + 1, 0);
+            test_target->data()[offset] = 1;
+            test_target->data()[offset + 1] = 0;
         } else {
-            test_target->set_data(offset, 0);
-            test_target->set_data(offset + 1, 1);
+            test_target->data()[offset] = 0;
+            test_target->data()[offset + 1] = 1;
         }
     }
 

@@ -28,10 +28,33 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(Catch2) #Catch2::Catch2
 
+# Target CPU for the project's own code (the -march= value), which decides
+# which SIMD instructions the compiler may use when auto-vectorizing loops.
+# Empty (default): the compiler's generic x86-64 target, i.e. SSE2 only
+# (4 floats per instruction). "native": every extension of the build machine
+# (e.g. AVX2 = 8 floats, AVX-512 = 16); the executables may then not run on
+# other CPUs. "haswell": AVX2 without AVX-512, which Valgrind/Callgrind
+# supports, so it is the one to use for profiling builds.
+set(NN_MARCH "" CACHE STRING "Value passed to -march= for the project's code (e.g. native, haswell); empty = compiler default")
+
+# Interface target carrying the flag: linked PUBLIC by tensor_lib below, it
+# reaches every project library and executable (all of them depend on
+# tensor_lib), but not the FetchContent dependencies (Catch2, benchmark,
+# OpenBLAS), which keep their own build settings.
+add_library(nn_arch_flags INTERFACE)
+if(NN_MARCH)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(nn_arch_flags INTERFACE -march=${NN_MARCH})
+    else()
+        message(WARNING "NN_MARCH is only supported with GCC/Clang; ignoring it for ${CMAKE_CXX_COMPILER_ID}")
+    endif()
+endif()
+
 add_library(tensor_lib
             src/core/tensor.cpp
             src/core/rng.cpp)
 target_include_directories(tensor_lib PUBLIC include)
+target_link_libraries(tensor_lib PUBLIC nn_arch_flags)
 
 add_library(operations_lib
             src/ops/matadd.cpp

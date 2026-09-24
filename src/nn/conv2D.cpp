@@ -10,15 +10,17 @@ Conv2D::Conv2D(size_t C_in, size_t C_out, size_t kernel_height, size_t kernel_wi
     std::normal_distribution<float> dis(0.0f, 1.0f);
     auto &gen = rng::engine();
 
+    float *weights_data = weights->data();
     for (size_t i = 0; i < weights->size(); ++i) {
-        weights->set_data(i, dis(gen));
+        weights_data[i] = dis(gen);
     }
 
     std::vector<size_t> shape_b = {C_out, 1};
     std::shared_ptr<Tensor> biases = std::make_shared<Tensor>(shape_b);
 
+    float *biases_data = biases->data();
     for (size_t i = 0; i < biases->size(); ++i) {
-        biases->set_data(i, 0.0f);
+        biases_data[i] = 0.0f;
     }
 
     params = {weights, biases};
@@ -41,7 +43,7 @@ std::shared_ptr<Tensor> Conv2D::forward(const std::shared_ptr<Tensor> &input) co
         std::shared_ptr<MatMulOp> multiplication = std::make_shared<MatMulOp>(multiplication_params);
         std::shared_ptr<Tensor> mul_output = multiplication->forward();
 
-        auto sum_params = std::vector<std::shared_ptr<Tensor>>{params[1], mul_output};
+        auto sum_params = std::vector<std::shared_ptr<Tensor>>{mul_output, params[1]};
         std::shared_ptr<MatAddOp> sum = std::make_shared<MatAddOp>(sum_params);
         std::shared_ptr<Tensor> sum_output = sum->forward();
 

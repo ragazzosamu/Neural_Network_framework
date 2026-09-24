@@ -19,7 +19,7 @@ std::shared_ptr<Tensor> SoftmaxOp::forward() {
         throw std::invalid_argument("Input tensor must not be null");
     }
 
-    auto data = input->data();
+    const float *data = input->data();
     std::vector<size_t> shape = input->shape();
 
     // shape.back() below requires at least one dimension.
@@ -27,7 +27,12 @@ std::shared_ptr<Tensor> SoftmaxOp::forward() {
         throw std::invalid_argument("Input tensor must have at least 1 dimension");
     }
 
-    Tensor output(shape);
+    // The output buffer is created here so that it can be shared, without
+    // copying, with saved_output below (see the end of this function).
+    size_t total_size = input->size();
+    std::shared_ptr<float[]> output_buffer(new float[total_size]);
+    Tensor output(shape, output_buffer);
+    float *output_data = output.data();
 
     // Softmax is applied to each row independently: in the common case the
     // input is a single row (a vector), but for a transformer it's typically
@@ -40,7 +45,7 @@ std::shared_ptr<Tensor> SoftmaxOp::forward() {
         throw std::invalid_argument("The last dimension must be non-zero");
     }
 
-    size_t operation_number = input->size() / row_length;
+    size_t operation_number = total_size / row_length;
 
     for (size_t i = 0; i < operation_number; ++i) {
         size_t offset = i * row_length;
@@ -53,12 +58,12 @@ std::shared_ptr<Tensor> SoftmaxOp::forward() {
         // Compute exp(x - max_value) for the row and accumulate the sum
         // needed to normalize it right after.
         for (size_t j = 0; j < row_length; ++j) {
-            output.set_data(offset + j, std::exp(data[offset + j] - max_value));
-            sum += output.data()[offset + j];
+            output_data[offset + j] = std::exp(data[offset + j] - max_value);
+            sum += output_data[offset + j];
         }
 
         for (size_t j = 0; j < row_length; ++j) {
-            output.set_data(offset + j, output.data()[offset + j] / sum);
+            output_data[offset + j] /= sum;
         }
     }
 
@@ -67,9 +72,14 @@ std::shared_ptr<Tensor> SoftmaxOp::forward() {
         output.set_operation(shared_from_this());
     }
 
-    // The output is needed again, unchanged, during backward() (see the
-    // derivative formula there), so it's cached here.
-    saved_output = std::make_shared<Tensor>(output.clone());
+    // The output is needed again during backward() (see the derivative
+    // formula there), so it's cached here. saved_output shares the same buffer
+    // as the returned tensor instead of copying it. It is a separate Tensor
+    // with no operation attached: storing the returned tensor itself would
+    // create a reference cycle (op -> saved_output -> op) and leak both.
+    // Note: modifying the returned tensor in place before backward() would
+    // therefore also change the values used by backward().
+    saved_output = std::make_shared<Tensor>(shape, output_buffer, false);
 
     return std::make_shared<Tensor>(std::move(output));
 }
@@ -119,19 +129,21 @@ void SoftmaxOp::backward(std::shared_ptr<Tensor> grad) const {
 
     size_t operation_number = input->size() / row_length;
 
-    auto grad_input = input->get_grad();
+    float *grad_input = input->get_grad()->data();
+    const float *grad_data = grad->data();
+    const float *output_data = saved_output->data();
     for (size_t i = 0; i < operation_number; ++i) {
         size_t offset = i * row_length;
 
         // dot_product = sum_k(g_k * y_k) for this row.
         float dot_product = 0.0f;
         for (size_t j = 0; j < row_length; ++j) {
-            dot_product += grad->data()[offset + j] * saved_output->data()[offset + j];
+            dot_product += grad_data[offset + j] * output_data[offset + j];
         }
 
         for (size_t j = 0; j < row_length; ++j) {
-            float dx_j = saved_output->data()[offset + j] * (grad->data()[offset + j] - dot_product);
-            grad_input->add_to_data(offset + j, dx_j);
+            float dx_j = output_data[offset + j] * (grad_data[offset + j] - dot_product);
+            grad_input[offset + j] += dx_j;
         }
     }
 }

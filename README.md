@@ -78,6 +78,22 @@ The OpenBLAS installation must contain `include/cblas.h` and the corresponding
 library under `lib/`. The library architecture must match the selected Visual
 Studio architecture: use an x64 OpenBLAS library for an x64 build.
 
+### Target CPU (SIMD vectorization)
+
+By default the compiler targets a generic x86-64 CPU, so auto-vectorized loops
+use SSE2 only (4 floats per instruction). With GCC/Clang, `NN_MARCH` sets the
+`-march=` value for the project's own code (dependencies are not affected):
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DNN_MARCH=native
+cmake --build build
+```
+
+- `native`: every SIMD extension of the build machine (e.g. AVX2, AVX-512).
+  The executables may not run on a different CPU.
+- `haswell`: AVX2 without AVX-512. Use it for Callgrind builds, since Valgrind
+  does not support AVX-512 instructions.
+
 ## Run the Tests
 
 The test programs are built as separate executables. On Linux or macOS:
@@ -243,6 +259,27 @@ that function and its callees, so nested inclusive percentages must not be
 added together. Record the model and profiling batch limit with the top
 percentages, separately from the naive and OpenBLAS Release timing results.
 These percentages describe the instruction profile, not elapsed-time shares.
+
+### WSL or Windows?
+
+Run timing comparisons and profiling in WSL (or native Linux), not in a
+Windows/Visual Studio build:
+
+- `NN_MARCH` is applied only with GCC/Clang. With MSVC it is ignored (CMake
+  prints a warning), so a native-vs-generic comparison is not possible there.
+- Valgrind/Callgrind and `scripts/profile_mnist_callgrind.sh` are Linux-only.
+  The Visual Studio profiler produces a different report that cannot be
+  compared with the Callgrind results.
+- Before/after comparisons are only meaningful with the same compiler and
+  environment: switching from GCC to MSVC would mix the effect of the code
+  changes with the effect of the compiler.
+
+WSL2 runs the code directly on the CPU, and the benchmark only computes in
+memory, so its timings are representative of Linux. Always compare WSL builds
+with WSL builds, never a WSL timing with a Windows one. Build and run in the
+Linux-side copy described below rather than under `/mnt/c`: every file access
+under `/mnt/c` goes through the Windows filesystem, which makes compiling
+(especially OpenBLAS) much slower.
 
 ### Working from a Windows checkout in WSL
 

@@ -8,12 +8,12 @@ void SGD::step() {
             throw std::runtime_error("SGD optimizer: gradient is null for a parameter");
         }
 
-        auto const &param_data = param->data();
-        auto const &grad_data = grad->data();
+        float *param_data = param->data();
+        const float *grad_data = grad->data();
+        const size_t size = param->size();
 
-        for (size_t i = 0; i < param->size(); ++i) {
-            float new_value = param_data[i] - learning_rate * grad_data[i];
-            param->set_data(i, new_value);
+        for (size_t i = 0; i < size; ++i) {
+            param_data[i] -= learning_rate * grad_data[i];
         }
     }
 }

@@ -52,6 +52,18 @@ class MatAddOp : public Operation {
 
   private:
     /**
+     * @brief True for the Linear bias layout: A = [R, N] (the values),
+     *        B = [1, N] (the bias). The bias row is added to every row of A.
+     */
+    static bool is_row_bias(const std::vector<size_t> &shapeA, const std::vector<size_t> &shapeB);
+
+    /**
+     * @brief True for the Conv2D bias layout: A = [batch, C, P] (the values),
+     *        B = [C, 1] (the bias). bias[c] is added to every element of row (batch, c).
+     */
+    static bool is_channel_bias(const std::vector<size_t> &shapeA, const std::vector<size_t> &shapeB);
+
+    /**
      * @brief Given a flat output index, decomposes it into per-dimension
      *        coordinates and uses them, together with each tensor's
      *        broadcast-adjusted strides, to compute the corresponding memory

@@ -1,4 +1,5 @@
 #include "core/tensor.hpp"
+#include "ops/operation.hpp"
 #include <catch2/catch_test_macros.hpp>
 #include <cstddef>
 #include <memory>
@@ -15,7 +16,7 @@ TEST_CASE("Initialization test", "[Tensor][Initialization]") {
     SECTION("With data") {
         Tensor tensor(shape, data);
         REQUIRE(tensor.size() == 12);
-        REQUIRE(tensor.data() == data);
+        REQUIRE(tensor.data() == data.get());
     }
 
     SECTION("Requires grad flag") {
@@ -208,4 +209,64 @@ TEST_CASE("Grad accessors", "[Tensor][Grad]") {
 
     REQUIRE(tensor.get_grad() == grad_tensor);
     REQUIRE(tensor.get_grad()->shape()[0] == 2);
+}
+
+TEST_CASE("Clone of a non-contiguous view", "[Tensor][Clone]") {
+    // [[0, 1, 2],
+    //  [3, 4, 5]]
+    vector<size_t> shape{2, 3};
+    std::shared_ptr<float[]> data(new float[]{0, 1, 2, 3, 4, 5});
+    Tensor tensor(shape, data);
+
+    SECTION("Transpose") {
+        // Logical values of the transpose, row by row: [[0, 3], [1, 4], [2, 5]].
+        Tensor cloned = tensor.transpose().clone();
+
+        REQUIRE(cloned.shape() == vector<size_t>{3, 2});
+        REQUIRE(cloned.strides() == vector<size_t>{2, 1});
+        const float expected[] = {0, 3, 1, 4, 2, 5};
+        for (size_t i = 0; i < 6; ++i) {
+            REQUIRE(cloned.data()[i] == expected[i]);
+        }
+    }
+
+    SECTION("Permute") {
+        // [1, 2, 3] -> permute {2, 0, 1} -> [3, 1, 2]
+        Tensor tensor3d(vector<size_t>{1, 2, 3}, data);
+        Tensor cloned = tensor3d.permute({2, 0, 1}).clone();
+
+        REQUIRE(cloned.shape() == vector<size_t>{3, 1, 2});
+        const float expected[] = {0, 3, 1, 4, 2, 5};
+        for (size_t i = 0; i < 6; ++i) {
+            REQUIRE(cloned.data()[i] == expected[i]);
+        }
+    }
+}
+
+namespace {
+// Minimal Operation used only to check that views drop the producing operation.
+class DummyOp : public Operation {
+  public:
+    using Operation::Operation;
+    std::shared_ptr<Tensor> forward() override { return nullptr; }
+    void backward(std::shared_ptr<Tensor>) const override {}
+};
+} // namespace
+
+TEST_CASE("Views are detached from the autograd graph", "[Tensor][Transpose][Permute]") {
+    Tensor tensor(vector<size_t>{2, 3});
+    tensor.set_operation(std::make_shared<DummyOp>(std::vector<std::shared_ptr<Tensor>>{}));
+    tensor.set_grad(std::make_shared<Tensor>(vector<size_t>{2, 3}));
+
+    Tensor transposed = tensor.transpose();
+    REQUIRE(transposed.get_operation() == nullptr);
+    REQUIRE(transposed.get_grad() == nullptr);
+
+    Tensor permutated = tensor.permute({1, 0});
+    REQUIRE(permutated.get_operation() == nullptr);
+    REQUIRE(permutated.get_grad() == nullptr);
+
+    // The original tensor keeps its place in the graph.
+    REQUIRE(tensor.get_operation() != nullptr);
+    REQUIRE(tensor.get_grad() != nullptr);
 }

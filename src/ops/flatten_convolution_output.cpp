@@ -31,8 +31,10 @@ void FlattenConvolutionOutputOp::backward(std::shared_ptr<Tensor> grad) const {
         input->set_grad(std::make_shared<Tensor>(input->shape()));
     }
 
-    auto input_grad = input->get_grad();
-    for (std::size_t index = 0; index < input->size(); ++index) {
-        input_grad->add_to_data(index, grad->data()[index]);
+    float *input_grad = input->get_grad()->data();
+    const float *grad_data = grad->data();
+    const std::size_t size = input->size();
+    for (std::size_t index = 0; index < size; ++index) {
+        input_grad[index] += grad_data[index];
     }
 }

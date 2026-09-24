@@ -20,7 +20,7 @@ std::shared_ptr<Tensor> make_tensor(const std::vector<size_t> &shape, const std:
     auto tensor = std::make_shared<Tensor>(shape);
     REQUIRE(tensor->size() == values.size());
     for (size_t i = 0; i < values.size(); ++i) {
-        tensor->set_data(i, values[i]);
+        tensor->data()[i] = values[i];
     }
     return tensor;
 }
@@ -53,11 +53,11 @@ class TwoLayerGraph : public Module {
 
         const std::vector<float> weights1_values{1.0f, 2.0f, 3.0f, 4.0f};
         for (size_t i = 0; i < weights1->size(); ++i) {
-            weights1->set_data(i, weights1_values[i]);
+            weights1->data()[i] = weights1_values[i];
         }
         const std::vector<float> weights2_values{5.0f, 6.0f};
         for (size_t i = 0; i < weights2->size(); ++i) {
-            weights2->set_data(i, weights2_values[i]);
+            weights2->data()[i] = weights2_values[i];
         }
     }
 

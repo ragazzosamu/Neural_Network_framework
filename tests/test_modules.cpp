@@ -133,7 +133,7 @@ TEST_CASE("Module::save_gradients writes a hierarchical JSON state", "[nn][modul
     const std::string filename = "gradients/save_gradients_test.json";
     std::filesystem::create_directories("gradients");
     auto gradient = std::make_shared<Tensor>(std::vector<size_t>{4, 8});
-    gradient->set_data(0, 3.5f);
+    gradient->data()[0] = 3.5f;
     net.linear1->parameters()[0]->set_grad(gradient);
 
     REQUIRE_NOTHROW(net.save_gradients(filename));
@@ -210,13 +210,13 @@ TEST_CASE("Conv2D: forward computes output shape and values", "[nn][conv2d]") {
 
     // Use deterministic parameters: a 2x2 all-ones filter and zero bias.
     for (size_t i = 0; i < parameters[0]->size(); ++i) {
-        parameters[0]->set_data(i, 1.0f);
+        parameters[0]->data()[i] = 1.0f;
     }
-    parameters[1]->set_data(0, 0.0f);
+    parameters[1]->data()[0] = 0.0f;
 
     auto input = std::make_shared<Tensor>(std::vector<size_t>{2, 1, 3, 3});
     for (size_t i = 0; i < input->size(); ++i) {
-        input->set_data(i, 1.0f);
+        input->data()[i] = 1.0f;
     }
 
     auto output = convolution.forward(input);

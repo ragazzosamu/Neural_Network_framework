@@ -19,8 +19,9 @@ Linear::Linear(size_t input_size, size_t output_size) {
     std::normal_distribution<float> dis(0.0f, 1.0f);
     auto &gen = rng::engine();
 
+    float *weights_data = weights->data();
     for (size_t i = 0; i < weights->size(); ++i) {
-        weights->set_data(i, dis(gen));
+        weights_data[i] = dis(gen);
     }
 
     // Bias is one value per output feature, initialized to zero. Starting
@@ -29,8 +30,9 @@ Linear::Linear(size_t input_size, size_t output_size) {
     std::vector<size_t> shape_b = {1, output_size};
     std::shared_ptr<Tensor> biases = std::make_shared<Tensor>(shape_b);
 
+    float *biases_data = biases->data();
     for (size_t i = 0; i < biases->size(); ++i) {
-        biases->set_data(i, 0.0f);
+        biases_data[i] = 0.0f;
     }
 
     params = {weights, biases};
@@ -60,7 +62,7 @@ std::shared_ptr<Tensor> Linear::forward(const std::shared_ptr<Tensor> &input) co
         std::shared_ptr<MatMulOp> multiplication = std::make_shared<MatMulOp>(multiplication_params);
         std::shared_ptr<Tensor> mul_output = multiplication->forward();
 
-        auto sum_params = {params[1], mul_output};
+        auto sum_params = {mul_output, params[1]};
         std::shared_ptr<MatAddOp> sum = std::make_shared<MatAddOp>(sum_params);
         std::shared_ptr<Tensor> sum_output = sum->forward();
 

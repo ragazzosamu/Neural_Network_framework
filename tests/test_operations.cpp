@@ -27,7 +27,7 @@ static std::shared_ptr<Tensor> make_tensor(const std::vector<size_t> &shape, con
     auto t = std::make_shared<Tensor>(shape);
     REQUIRE(t->size() == values.size());
     for (size_t i = 0; i < values.size(); ++i) {
-        t->set_data(i, values[i]);
+        t->data()[i] = values[i];
     }
     return t;
 }
@@ -729,4 +729,149 @@ TEST_CASE("A single layer (MatMulOp -> ReluOp) forward and backward", "[operatio
     REQUIRE(x->get_grad()->data()[0] == Approx(1));
     REQUIRE(x->get_grad()->data()[1] == Approx(-1));
     REQUIRE(x->get_grad()->data()[2] == Approx(2));
+}
+// ---------------------------------------------------------------------------
+// Backward on non-contiguous inputs
+// ---------------------------------------------------------------------------
+// Gradients are always allocated contiguous, so an op receiving a
+// non-contiguous view (transpose()/permute()) must write the gradient through
+// the gradient's own strides, not the view's. Each test runs the same backward
+// on a view and on a contiguous copy of it (clone()): the two gradients must match.
+
+namespace {
+std::vector<float> iota_values(size_t count) {
+    std::vector<float> values(count);
+    for (size_t i = 0; i < count; ++i) {
+        values[i] = 0.5f * static_cast<float>(i) + 1.0f;
+    }
+    return values;
+}
+
+void require_same_gradient(const std::shared_ptr<Tensor> &a, const std::shared_ptr<Tensor> &b) {
+    REQUIRE(a->get_grad() != nullptr);
+    REQUIRE(b->get_grad() != nullptr);
+    REQUIRE(a->get_grad()->shape() == b->get_grad()->shape());
+    for (size_t i = 0; i < a->get_grad()->size(); ++i) {
+        REQUIRE(a->get_grad()->data()[i] == Approx(b->get_grad()->data()[i]));
+    }
+}
+} // namespace
+
+TEST_CASE("MatAddOp: backward on a transposed view", "[operation][matadd][backward][strides]") {
+    auto base = make_tensor({2, 3}, iota_values(6));
+    auto view = std::make_shared<Tensor>(base->transpose()); // [3, 2], strides {1, 3}
+    auto contiguous = std::make_shared<Tensor>(view->clone());
+    auto B = make_tensor({3, 2}, iota_values(6));
+    auto grad = make_tensor({3, 2}, iota_values(6));
+
+    std::make_shared<MatAddOp>(std::vector<std::shared_ptr<Tensor>>{view, B})->backward(grad);
+    std::make_shared<MatAddOp>(std::vector<std::shared_ptr<Tensor>>{contiguous, make_tensor({3, 2}, iota_values(6))})->backward(grad);
+
+    require_same_gradient(view, contiguous);
+}
+
+TEST_CASE("MatMulOp: backward on transposed views", "[operation][matmul][backward][strides]") {
+    auto viewA = std::make_shared<Tensor>(make_tensor({2, 3}, iota_values(6))->transpose()); // [3, 2]
+    auto viewB = std::make_shared<Tensor>(make_tensor({2, 2}, iota_values(4))->transpose()); // [2, 2]
+    auto contiguousA = std::make_shared<Tensor>(viewA->clone());
+    auto contiguousB = std::make_shared<Tensor>(viewB->clone());
+    auto grad = make_tensor({3, 2}, iota_values(6));
+
+    std::make_shared<MatMulOp>(std::vector<std::shared_ptr<Tensor>>{viewA, viewB})->backward(grad);
+    std::make_shared<MatMulOp>(std::vector<std::shared_ptr<Tensor>>{contiguousA, contiguousB})->backward(grad);
+
+    require_same_gradient(viewA, contiguousA);
+    require_same_gradient(viewB, contiguousB);
+}
+
+TEST_CASE("Im2ColOp: backward on a permuted view", "[operation][im2col][backward][strides]") {
+    auto base = make_tensor({1, 2, 3, 4}, iota_values(24));
+    auto view = std::make_shared<Tensor>(base->permute({0, 1, 3, 2})); // [1, 2, 4, 3]
+    auto contiguous = std::make_shared<Tensor>(view->clone());
+
+    // Kernel 2x2, padding 1: output is 5x4 patches of 2*2*2 values.
+    auto grad = make_tensor({1, 8, 20}, iota_values(160));
+
+    std::make_shared<im2ColOp>(std::vector<std::shared_ptr<Tensor>>{view}, 2, 2, 1)->backward(grad);
+    std::make_shared<im2ColOp>(std::vector<std::shared_ptr<Tensor>>{contiguous}, 2, 2, 1)->backward(grad);
+
+    require_same_gradient(view, contiguous);
+}
+
+// ---------------------------------------------------------------------------
+// MatAddOp forward fast paths
+// ---------------------------------------------------------------------------
+
+TEST_CASE("MatAddOp: forward fast paths", "[operation][matadd][forward]") {
+    SECTION("same shape, non-contiguous view falls back to the general path") {
+        // base = [[1, 2, 3], [4, 5, 6]] -> transposed view [[1, 4], [2, 5], [3, 6]]
+        auto view = std::make_shared<Tensor>(make_tensor({2, 3}, {1, 2, 3, 4, 5, 6})->transpose());
+        auto B = make_tensor({3, 2}, {10, 20, 30, 40, 50, 60});
+        auto output = std::make_shared<MatAddOp>(std::vector<std::shared_ptr<Tensor>>{view, B})->forward();
+
+        const std::vector<float> expected = {11, 24, 32, 45, 53, 66};
+        REQUIRE(output->shape() == std::vector<size_t>{3, 2});
+        for (size_t i = 0; i < expected.size(); ++i) {
+            REQUIRE(output->data()[i] == Approx(expected[i]));
+        }
+    }
+
+    SECTION("Linear bias [R, N] + [1, N]") {
+        auto bias = make_tensor({1, 3}, {1, 2, 3});
+        auto B = make_tensor({2, 3}, {10, 20, 30, 40, 50, 60});
+        auto output = std::make_shared<MatAddOp>(std::vector<std::shared_ptr<Tensor>>{B, bias})->forward();
+
+        const std::vector<float> expected = {11, 22, 33, 41, 52, 63};
+        REQUIRE(output->shape() == std::vector<size_t>{2, 3});
+        for (size_t i = 0; i < expected.size(); ++i) {
+            REQUIRE(output->data()[i] == Approx(expected[i]));
+        }
+    }
+
+    SECTION("Conv2D bias [batch, C, P] + [C, 1]") {
+        auto bias = make_tensor({2, 1}, {1, 2});
+        auto B = make_tensor({2, 2, 3}, {10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120});
+        auto output = std::make_shared<MatAddOp>(std::vector<std::shared_ptr<Tensor>>{B, bias})->forward();
+
+        // Rows alternate channel 0 (+1) and channel 1 (+2).
+        const std::vector<float> expected = {11, 21, 31, 42, 52, 62, 71, 81, 91, 102, 112, 122};
+        REQUIRE(output->shape() == std::vector<size_t>{2, 2, 3});
+        for (size_t i = 0; i < expected.size(); ++i) {
+            REQUIRE(output->data()[i] == Approx(expected[i]));
+        }
+    }
+}
+
+TEST_CASE("MatAddOp: backward of the bias fast paths", "[operation][matadd][backward]") {
+    SECTION("Linear bias [R, N] + [1, N]") {
+        auto values = make_tensor({2, 3}, {10, 20, 30, 40, 50, 60});
+        auto bias = make_tensor({1, 3}, {1, 2, 3});
+        auto grad = make_tensor({2, 3}, {0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f});
+        std::make_shared<MatAddOp>(std::vector<std::shared_ptr<Tensor>>{values, bias})->backward(grad);
+
+        // dValues = grad; dBias[column] = sum of that column over the rows.
+        for (size_t i = 0; i < 6; ++i) {
+            REQUIRE(values->get_grad()->data()[i] == Approx(grad->data()[i]));
+        }
+        const std::vector<float> expected_bias = {0.5f, 0.7f, 0.9f};
+        for (size_t i = 0; i < 3; ++i) {
+            REQUIRE(bias->get_grad()->data()[i] == Approx(expected_bias[i]));
+        }
+    }
+
+    SECTION("Conv2D bias [batch, C, P] + [C, 1]") {
+        auto values = make_tensor({2, 2, 3}, std::vector<float>(12, 0.0f));
+        auto bias = make_tensor({2, 1}, {1, 2});
+        // batch 0: channel 0 = [0.1, 0.2, 0.3], channel 1 = [0.4, 0.5, 0.6]
+        // batch 1: channel 0 = [1, 2, 3],       channel 1 = [4, 5, 6]
+        auto grad = make_tensor({2, 2, 3}, {0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 1, 2, 3, 4, 5, 6});
+        std::make_shared<MatAddOp>(std::vector<std::shared_ptr<Tensor>>{values, bias})->backward(grad);
+
+        // dValues = grad; dBias[channel] = sum of that channel's rows over every batch.
+        for (size_t i = 0; i < 12; ++i) {
+            REQUIRE(values->get_grad()->data()[i] == Approx(grad->data()[i]));
+        }
+        REQUIRE(bias->get_grad()->data()[0] == Approx(0.6f + 6.0f));
+        REQUIRE(bias->get_grad()->data()[1] == Approx(1.5f + 15.0f));
+    }
 }

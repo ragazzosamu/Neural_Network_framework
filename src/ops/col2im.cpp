@@ -24,9 +24,11 @@ std::shared_ptr<Tensor> col2ImOp::forward() {
     }
 
     auto output = std::make_shared<Tensor>(std::vector<size_t>{input->shape()[0], input->shape()[1], output_height, output_width});
-    const auto input_data = input->data();
-    for (size_t i = 0; i < input->size(); ++i) {
-        output->set_data(i, input_data[i]);
+    const float *input_data = input->data();
+    float *output_data = output->data();
+    const size_t size = input->size();
+    for (size_t i = 0; i < size; ++i) {
+        output_data[i] = input_data[i];
     }
 
     if (input->requires_grad()) {
@@ -59,9 +61,10 @@ void col2ImOp::backward(std::shared_ptr<Tensor> grad) const {
         input->set_grad(std::make_shared<Tensor>(input->shape()));
     }
 
-    const auto grad_data = grad->data();
-    auto input_grad = input->get_grad();
-    for (size_t i = 0; i < input->size(); ++i) {
-        input_grad->add_to_data(i, grad_data[i]);
+    const float *grad_data = grad->data();
+    float *input_grad = input->get_grad()->data();
+    const size_t size = input->size();
+    for (size_t i = 0; i < size; ++i) {
+        input_grad[i] += grad_data[i];
     }
 }

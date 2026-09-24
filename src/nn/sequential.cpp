@@ -28,7 +28,7 @@ std::shared_ptr<Tensor> Sequential::forward(const std::shared_ptr<Tensor> &input
         /*
         if (auto relu_mod = std::dynamic_pointer_cast<Relu>(mod)) {
             if (call_count % 120 == 0) {
-                const float *raw = out->data().get();
+                const float *raw = out->data();
                 size_t zero_count = 0;
                 for (size_t i = 0; i < out->size(); ++i) {
                     if (raw[i] == 0.0f)

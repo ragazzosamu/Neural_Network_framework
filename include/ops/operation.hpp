@@ -23,5 +23,21 @@ class Operation : public std::enable_shared_from_this<Operation> {
         return shape.size() == 2 && strides.size() == 2 && strides[1] == 1 && strides[0] == shape[1];
     }
 
+    // True if the tensor is laid out row-major with no gaps, whatever its rank,
+    // so that element i of its logical (row-major) order is data()[i].
+    virtual bool is_contiguous(const std::shared_ptr<Tensor> &tensor) const {
+        const auto &shape = tensor->shape();
+        const auto &strides = tensor->strides();
+
+        size_t expected = 1;
+        for (size_t i = shape.size(); i-- > 0;) {
+            if (strides[i] != expected) {
+                return false;
+            }
+            expected *= shape[i];
+        }
+        return true;
+    }
+
     std::vector<std::shared_ptr<Tensor>> o_inputs;
 };

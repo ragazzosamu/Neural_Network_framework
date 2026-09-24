@@ -29,12 +29,13 @@ std::shared_ptr<Tensor> MseOp::forward() {
         throw std::invalid_argument("The last dimension must be non-zero");
     }
 
-    auto predicted_data = predicted->data();
-    auto target_data = target->data();
+    const float *predicted_data = predicted->data();
+    const float *target_data = target->data();
 
     vector<size_t> loss_shape = shape;
     loss_shape.back() = 1;
     Tensor loss(loss_shape);
+    float *loss_data = loss.data();
 
     size_t operation_number = predicted->size() / column_number;
 
@@ -47,7 +48,7 @@ std::shared_ptr<Tensor> MseOp::forward() {
             sum += diff * diff;
         }
 
-        loss.set_data(i, sum / static_cast<float>(column_number));
+        loss_data[i] = sum / static_cast<float>(column_number);
     }
 
     auto output = std::make_shared<Tensor>(loss);
@@ -95,10 +96,10 @@ void MseOp::backward(std::shared_ptr<Tensor> grad) const {
         predicted->set_grad(std::make_shared<Tensor>(shape));
     }
 
-    auto predicted_data = predicted->data();
-    auto target_data = target->data();
-    auto grad_data = grad->data();
-    auto predicted_grad = predicted->get_grad();
+    const float *predicted_data = predicted->data();
+    const float *target_data = target->data();
+    const float *grad_data = grad->data();
+    float *predicted_grad = predicted->get_grad()->data();
 
     size_t operation_number = predicted->size() / column_number;
 
@@ -108,7 +109,7 @@ void MseOp::backward(std::shared_ptr<Tensor> grad) const {
 
         for (size_t j = 0; j < column_number; ++j) {
             float final_grad = grad_row * 2.0f * (predicted_data[offset + j] - target_data[offset + j]);
-            predicted_grad->add_to_data(offset + j, final_grad);
+            predicted_grad[offset + j] += final_grad;
         }
     }
 }

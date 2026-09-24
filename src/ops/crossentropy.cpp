@@ -42,14 +42,15 @@ std::shared_ptr<Tensor> CrossEntropyOp::forward() {
         throw std::invalid_argument("The last dimension must be non-zero");
     }
 
-    auto model_output_data = model_output->data();
-    auto target_data = target->data();
+    const float *model_output_data = model_output->data();
+    const float *target_data = target->data();
 
     // One loss value per row: same shape as the inputs, but with the last
     // dimension collapsed to 1.
     vector<size_t> loss_shape = shape;
     loss_shape.back() = 1;
     Tensor loss(loss_shape);
+    float *loss_data = loss.data();
 
     size_t operation_number = model_output->size() / column_number;
 
@@ -66,7 +67,7 @@ std::shared_ptr<Tensor> CrossEntropyOp::forward() {
             sum += target_data[offset + j] * std::log(model_output_data[offset + j] + kEpsilon);
         }
 
-        loss.set_data(i, -sum);
+        loss_data[i] = -sum;
     }
 
     if (model_output->requires_grad() || target->requires_grad()) {
@@ -119,10 +120,10 @@ void CrossEntropyOp::backward(std::shared_ptr<Tensor> grad) const {
         model_output->set_grad(std::make_shared<Tensor>(shape));
     }
 
-    auto model_output_data = model_output->data();
-    auto target_data = target->data();
-    auto grad_data = grad->data();
-    auto grad_output = model_output->get_grad();
+    const float *model_output_data = model_output->data();
+    const float *target_data = target->data();
+    const float *grad_data = grad->data();
+    float *grad_output = model_output->get_grad()->data();
 
     size_t size = model_output->size();
 
@@ -134,6 +135,6 @@ void CrossEntropyOp::backward(std::shared_ptr<Tensor> grad) const {
         float local_grad = target_data[i] / (model_output_data[i] + kEpsilon);
         float total_grad = grad_data[batch_idx] * local_grad;
 
-        grad_output->add_to_data(i, -total_grad);
+        grad_output[i] -= total_grad;
     }
 }

@@ -54,14 +54,16 @@ class Tensor : public std::enable_shared_from_this<Tensor> {
 
     /**
      * @brief Returns a view with reversed axis order. Shares the same data buffer;
-     *        does not carry the gradients
+     *        is detached from the autograd graph (no gradient, no producing
+     *        operation), so gradients do not flow back through it.
      * @throws std::invalid_argument If the element counts don't match.
      */
     Tensor transpose() const;
 
     /**
      * @brief Returns a view with axis reordered according to @p new_axis.
-     *        Shares the same data buffer; does not carry the gradients
+     *        Shares the same data buffer; is detached from the autograd graph
+     *        (no gradient, no producing operation), like transpose().
      * @param new_axis Permutation of [0, rank): new_axis[i] gives the
      *        original axis that becomes axis i in the result.
      * @throws std::invalid_argument If new_axis.size() != shape().size().
@@ -71,8 +73,9 @@ class Tensor : public std::enable_shared_from_this<Tensor> {
     Tensor permute(const vector<size_t> &new_axis) const;
 
     /**
-     * @brief Returns a deep copy with its own independent data buffer.
-     *        The gradient is not copied.
+     * @brief Returns a deep copy with its own independent, contiguous data
+     *        buffer holding the same logical values (a non-contiguous view is
+     *        materialized in row-major order). The gradient is not copied.
      */
     Tensor clone() const;
 
@@ -84,9 +87,16 @@ class Tensor : public std::enable_shared_from_this<Tensor> {
     const vector<size_t> &shape() const;
     const vector<size_t> &strides() const;
     size_t size() const;
-    std::shared_ptr<float[]> data() const;
-    void set_data(size_t i, float value);
-    void add_to_data(size_t i, float value);
+
+    /**
+     * @brief Returns the raw pointer to the underlying buffer.
+     *
+     * Defined inline so that element access in hot loops compiles to a plain
+     * load/store. The pointer stays valid as long as this tensor (or any
+     * other tensor sharing the same buffer) is alive. Index it with strides()
+     * when the tensor is a non-contiguous view (transpose()/permute()).
+     */
+    float *data() const { return t_data.get(); }
 
     float item() const; // if the tensor has exactly one element, return it; otherwise throw.
 

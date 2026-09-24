@@ -85,7 +85,7 @@ void training_loop(const std::vector<std::shared_ptr<Tensor>> &input, std::vecto
             auto prediction = model->forward(input[b]);
             auto loss = Loss::cross_entropy(prediction, target[b]);
             train_loss += loss->item();
-            const float *raw_ptr = prediction->data().get();
+            const float *raw_ptr = prediction->data();
             for (std::size_t k = 0; k < input[b]->shape()[0]; ++k) {
                 const std::size_t offset = k * 10;
                 const float *max_it = std::max_element(raw_ptr + offset, raw_ptr + offset + 10);
@@ -98,7 +98,7 @@ void training_loop(const std::vector<std::shared_ptr<Tensor>> &input, std::vecto
         }
         train_loss /= static_cast<float>(n_train);
         std::size_t train_samples = 0;
-        for (std::size_t b = 0; b < n_train; ++b) // era il range-for su tutto input
+        for (std::size_t b = 0; b < n_train; ++b)
             train_samples += input[b]->shape()[0];
         train_accuracy /= static_cast<float>(train_samples);
 
@@ -107,7 +107,7 @@ void training_loop(const std::vector<std::shared_ptr<Tensor>> &input, std::vecto
             auto prediction = model->forward(test_input[b]);
             auto loss = Loss::cross_entropy(prediction, test_target[b]);
             test_loss += loss->item();
-            const float *raw_ptr = prediction->data().get();
+            const float *raw_ptr = prediction->data();
             for (std::size_t k = 0; k < test_input[b]->shape()[0]; ++k) {
                 const std::size_t offset = k * 10;
                 const float *max_it = std::max_element(raw_ptr + offset, raw_ptr + offset + 10);
