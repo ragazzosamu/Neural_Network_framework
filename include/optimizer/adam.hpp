@@ -7,6 +7,11 @@
  *
  * Adam combines first-order and second-order moment estimates to scale each
  * parameter update based on the average gradient and its squared value.
+ *
+ * Both moment estimates start at zero, so during the first steps they are
+ * biased towards zero (the second one much longer, since beta2 is closer to 1).
+ * As in the original algorithm (Kingma & Ba, 2015), they are bias-corrected
+ * by dividing them by (1 - beta^t), where t is the step count.
  */
 class Adam : public Optimizer {
 
@@ -45,4 +50,7 @@ class Adam : public Optimizer {
 
     /// Second moment estimate for each parameter.
     std::vector<std::shared_ptr<Tensor>> v;
+
+    /// Number of step() calls so far (t in the bias correction).
+    size_t t = 0;
 };

@@ -9,6 +9,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include "core/rng.hpp"
 #include "loss.hpp"
 #include "mnist_dataloader.hpp"
 #include "nn/conv2D.hpp"
@@ -134,7 +135,20 @@ void training_loop(const std::vector<std::shared_ptr<Tensor>> &input, std::vecto
               << " | train_acc: " << final_train_accuracy << " | test_loss: " << final_test_loss << " | test_acc: " << final_test_accuracy << "\n";
 }
 
+// The weight initialization is the only random step of the benchmark (the
+// batches are not shuffled). With BENCH_SEED set, every run and every build
+// (e.g. CPU and GPU) starts from the same weights, so their losses and
+// accuracies can be compared directly. The seed is set again before each model,
+// so a model's weights don't depend on which models were trained before it.
+// Without BENCH_SEED, a random seed is used as before.
+void seed_from_env() {
+    if (const char *seed = std::getenv("BENCH_SEED")) {
+        rng::set_seed(static_cast<unsigned int>(std::stoul(seed)));
+    }
+}
+
 template <typename Model> void train_benchmark(MnistDatasetLoader::BatchTensors &train_batches, MnistDatasetLoader::BatchTensors &test_batches) {
+    seed_from_env();
     auto model = std::make_shared<Model>();
     model->init_he();
     training_loop(train_batches.images, train_batches.labels, test_batches.images, test_batches.labels, "BENCHMARK", model);

@@ -214,7 +214,11 @@ done
 ```
 
 Use `BENCH_MODEL=linear` to compare the linear model, or `BENCH_MODEL=all` to
-run both. By default, the benchmark uses all batches. To shorten a run, set
+run both. Set `BENCH_SEED` (for example `BENCH_SEED=42`) to start every run
+from the same initial weights: runs of the same build then give the same loss
+and accuracy, and different builds (naive, OpenBLAS, GPU) can be compared on
+their results as well as on their times. Without it, each run uses a random
+seed. By default, the benchmark uses all batches. To shorten a run, set
 `BENCH_MAX_BATCHES`, but use the same value for both builds and record it with
 the results. OpenBLAS thread count should also be held constant; use
 `OPENBLAS_NUM_THREADS=1` for a single-thread comparison.

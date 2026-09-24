@@ -125,7 +125,24 @@ TEST_CASE("Adam performs its first normalized update", "[optimizer][adam]") {
     Adam optimizer(0.1f, {parameter});
     REQUIRE_NOTHROW(optimizer.step());
 
-    require_values(parameter, {0.68377f, 2.31623f});
+    // With bias correction, m_hat = g and v_hat = g^2 at the first step, so
+    // every parameter moves by exactly learning_rate against its gradient's sign.
+    require_values(parameter, {0.9f, 2.1f});
+}
+
+TEST_CASE("Adam bias correction keeps the step equal to the learning rate for a constant gradient", "[optimizer][adam]") {
+    auto parameter = make_tensor({2}, {1.0f, 2.0f});
+    Adam optimizer(0.1f, {parameter});
+
+    // For a constant gradient the corrected estimates stay m_hat = g and
+    // v_hat = g^2 at every step, so each step moves the parameter by lr.
+    // Without the correction the second step would be about 4.3 * lr.
+    for (int step = 0; step < 2; ++step) {
+        parameter->set_grad(make_tensor({2}, {2.0f, -4.0f}));
+        REQUIRE_NOTHROW(optimizer.step());
+    }
+
+    require_values(parameter, {0.8f, 2.2f});
 }
 
 TEST_CASE("zero_grad clears every optimized parameter gradient", "[optimizer]") {

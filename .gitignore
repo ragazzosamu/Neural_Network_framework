@@ -54,6 +54,12 @@ lib/
 *.pch
 
 # ========================
+# Log e output di profiling
+# ========================
+*.log
+callgrind-results*/
+
+# ========================
 # Editor e IDE (VS Code, CLion, VS, Vim, Mac)
 # ========================
 .vscode/
