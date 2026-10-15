@@ -1,7 +1,21 @@
-cmake_minimum_required(VERSION 3.15)
-project(Neural_Networks_framework VERSION 1.0 LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.24)
+
+# GPU architecture the CUDA kernels are compiled for. "native" = the GPU(s) of
+# the build machine (e.g. 89 for an RTX 4070 SUPER). It must be set before
+# project(), otherwise CMake picks the compiler's default (an older, generic one).
+# Override it with -DCMAKE_CUDA_ARCHITECTURES=89 (or a list, e.g. "75;86;89").
+if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+    set(CMAKE_CUDA_ARCHITECTURES native)
+endif()
+
+# CUDA is required: the .cu files are compiled by nvcc, which on Windows only
+# works with MSVC (use the Visual Studio generator, not MinGW).
+project(Neural_Networks_framework VERSION 1.0 LANGUAGES CXX CUDA)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CUDA_STANDARD 20)
+set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+find_package(CUDAToolkit REQUIRED) # CUDA::cudart
 include(FetchContent)
 
 # Keep every FetchContent dependency inside the selected build directory.
@@ -44,7 +58,8 @@ set(NN_MARCH "" CACHE STRING "Value passed to -march= for the project's code (e.
 add_library(nn_arch_flags INTERFACE)
 if(NN_MARCH)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-        target_compile_options(nn_arch_flags INTERFACE -march=${NN_MARCH})
+        # C++ sources only: nvcc does not understand -march.
+        target_compile_options(nn_arch_flags INTERFACE $<$<COMPILE_LANGUAGE:CXX>:-march=${NN_MARCH}>)
     else()
         message(WARNING "NN_MARCH is only supported with GCC/Clang; ignoring it for ${CMAKE_CXX_COMPILER_ID}")
     endif()
@@ -52,9 +67,13 @@ endif()
 
 add_library(tensor_lib
             src/core/tensor.cpp
-            src/core/rng.cpp)
+            src/core/rng.cpp
+            src/cuda/memory.cu)
 target_include_directories(tensor_lib PUBLIC include)
 target_link_libraries(tensor_lib PUBLIC nn_arch_flags)
+# The CUDA runtime is used only inside the .cu files: the headers in
+# include/cuda/ are plain C++, so nothing else needs the CUDA headers.
+target_link_libraries(tensor_lib PRIVATE CUDA::cudart)
 
 add_library(operations_lib
             src/ops/matadd.cpp

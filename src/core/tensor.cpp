@@ -1,21 +1,30 @@
 #include "core/tensor.hpp"
+#include "cuda/memory.hpp"
 #include "ops/operation.hpp"
 
 using std::vector;
 
-Tensor::Tensor(vector<size_t> shape, bool require_grad) : t_shape(std::move(shape)), t_require_grad(require_grad) {
+Tensor::Tensor(vector<size_t> shape, bool require_grad, Device device) : t_shape(std::move(shape)), t_require_grad(require_grad), t_device(device) {
     totalSize = computeTotalSize(t_shape);
     computeStrides();
-    t_data = std::make_shared<float[]>(totalSize);
+    allocate_zeroed_buffer();
 }
 
-Tensor::Tensor(vector<size_t> shape, std::shared_ptr<float[]> data, bool require_grad) : t_shape(std::move(shape)), t_require_grad(require_grad) {
+Tensor::Tensor(vector<size_t> shape, std::shared_ptr<float[]> data, bool require_grad, Device device)
+    : t_shape(std::move(shape)), t_require_grad(require_grad), t_device(device) {
     totalSize = computeTotalSize(t_shape);
     computeStrides();
     if (data == nullptr) {
-        t_data = std::shared_ptr<float[]>(new float[totalSize]);
+        allocate_zeroed_buffer();
     } else {
-        t_data = std::move(data);
+        if (device == Device::CUDA) {
+            // data is in CPU memory: copy it into a new GPU buffer (not shared).
+            t_data = std::shared_ptr<float[]>(cuda_alloc(totalSize), cuda_free);
+            cuda_copy_cpu_to_gpu(t_data.get(), data.get(), totalSize);
+        } else {
+            // Shallow copy: the buffer is shared with the caller.
+            t_data = std::move(data);
+        }
     }
 }
 
@@ -75,19 +84,22 @@ Tensor Tensor::permute(const vector<size_t> &new_axis) const {
 }
 
 Tensor Tensor::clone() const {
-    auto new_data = std::shared_ptr<float[]>(new float[totalSize]);
 
+    Tensor cloned(t_shape, t_require_grad, t_device); // already with the buffer in the right place
+    float *dst = cloned.data();
     // The clone is always contiguous. When this tensor is a non-contiguous
-    // view (transpose()/permute()), the buffer can't be copied as-is: each
-    // element is read through the view's strides, in logical (row-major) order.
-    vector<size_t> contiguous_strides = t_strides;
-    for (size_t i = t_shape.size(); i-- > 0;) {
-        contiguous_strides[i] = (i + 1 < t_shape.size()) ? contiguous_strides[i + 1] * t_shape[i + 1] : 1;
-    }
+    // view (transpose()/permute()), the buffer can't be copied as-is
 
-    if (t_strides == contiguous_strides) {
-        std::copy(t_data.get(), t_data.get() + totalSize, new_data.get());
+    if (is_contiguous()) {
+        if (t_device == Device::CPU) {
+            std::copy(t_data.get(), t_data.get() + totalSize, dst);
+        } else {
+            cuda_copy_gpu_to_gpu(dst, t_data.get(), totalSize);
+        }
     } else {
+        if (t_device == Device::CUDA) {
+            throw std::runtime_error("clone() of a non-contiguous GPU tensor is not supported yet");
+        }
         for (size_t i = 0; i < totalSize; ++i) {
             size_t remaining = i;
             size_t offset = 0;
@@ -95,13 +107,35 @@ Tensor Tensor::clone() const {
                 offset += (remaining % t_shape[d]) * t_strides[d];
                 remaining /= t_shape[d];
             }
-            new_data[i] = t_data[offset];
+            dst[i] = t_data[offset];
         }
     }
 
-    Tensor cloned(t_shape, new_data);
-    cloned.set_requires_grad(t_require_grad);
     return cloned;
+}
+
+Device Tensor::device() const { return t_device; }
+
+void Tensor::to(Device target) {
+    if (t_device == target) {
+        return;
+    }
+
+    if (t_device == Device::CUDA) {
+        auto new_data = std::make_shared<float[]>(totalSize);
+        cuda_copy_gpu_to_cpu(new_data.get(), t_data.get(), totalSize);
+        t_data = std::move(new_data);
+    } else {
+        auto new_data = std::shared_ptr<float[]>(cuda_alloc(totalSize), cuda_free);
+        cuda_copy_cpu_to_gpu(new_data.get(), t_data.get(), totalSize);
+        t_data = std::move(new_data);
+    }
+
+    t_device = target;
+
+    if (grad) {
+        grad->to(target);
+    }
 }
 
 // ---------- Backward ----------
@@ -147,6 +181,12 @@ float Tensor::item() const {
     if (totalSize != 1) {
         throw std::invalid_argument("Tensor must have exactly one element to call item()");
     }
+    // The data are in the GPU memory (VRAM): the CPU can't read them directly
+    if (t_device == Device::CUDA) {
+        float value;
+        cuda_copy_gpu_to_cpu(&value, t_data.get(), 1);
+        return value;
+    }
     return t_data[0];
 }
 
@@ -171,6 +211,27 @@ size_t Tensor::computeTotalSize(const vector<size_t> &shape) {
         size *= dim;
     }
     return size;
+}
+
+void Tensor::allocate_zeroed_buffer() {
+    if (t_device == Device::CPU) {
+        t_data = std::make_shared<float[]>(totalSize);
+    } else {
+
+        t_data = std::shared_ptr<float[]>(cuda_alloc(totalSize), cuda_free);
+        cuda_memset_zero(t_data.get(), totalSize);
+    }
+}
+
+bool Tensor::is_contiguous() const {
+
+    vector<size_t> contiguous_strides = t_strides;
+    for (size_t i = t_shape.size(); i-- > 0;) {
+        contiguous_strides[i] = (i + 1 < t_shape.size()) ? contiguous_strides[i + 1] * t_shape[i + 1] : 1;
+    }
+
+    // if it's true the tensor is contiguous
+    return t_strides == contiguous_strides;
 }
 
 void Tensor::createComputationalgraph(std::vector<std::shared_ptr<Operation>> &computational_graph, std::shared_ptr<Tensor> tensor,
